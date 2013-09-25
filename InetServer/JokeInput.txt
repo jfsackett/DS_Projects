@@ -1,0 +1,27 @@
+# JokeServer Input file containing jokes & proverbs. 
+#
+# Must be ordered:
+# 1) Warning Message (1 line)
+# 2) Number of Jokes & Proverbs (1 line)
+# 3) Jokes (# lines as 2)
+# 4) Proverbs (# lines as 2)
+
+### Warning message to return when Server in Maintenance Mode.
+Server is undergoing maintenance. Please try again later.
+
+### Number of Jokes and Proverbs. Must be same number below.
+5
+
+### Jokes. Must be the same as the number above.
+A. Xname, Joke 1
+B. Joke 2, Xname
+C. Joke Xname 3
+D. Joke Xname 4
+E. JoXnameke 5
+
+### Proverbs. Must be the same as the number above.
+A. XnameProverb 1
+B. Proverb 2Xname
+C. ProverbXname 3
+D. Proverb Xname4
+E. Proverb 5
