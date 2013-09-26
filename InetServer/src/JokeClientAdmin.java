@@ -1,8 +1,55 @@
-/*
- * Notes:
- * Uses user id as cookie so using the same id will affect that client's state.
- * Continue prompting for mode changes, shutdown of server until admin client quit.
- */
+/*--------------------------------------------------------
+
+Joseph Sackett
+September 25, 2013
+
+Developed and tested with JDK 1.7.0_40.
+
+Build Instructions:
+Unzip all source files to same directory.
+From a command prompt in that directory, execute:
+javac *.java
+
+Execution Instructions:
+JokeServer works with JokeClient and JokeClientAdmin but JokeServer should be executed first.
+1) From a command prompt in the same directory as the build, execute:
+java JokeServer
+2) Open another command prompt in the same directory as the build, execute:
+java JokeClient
+3) Enter your email address at the prompt.
+4) Enter your name at the prompt.
+5) Expect it to return a joke containing your name.
+6) Decide whether to have it give you another joke or proverb.
+7) Open another command prompt in the same directory as the build, execute:
+java JokeClientAdmin
+8) Read the usage options to see what the Admin can do.
+9) Type: P and hit return to put the JokeServer in proverb mode.
+10) Return to JokeClient and make another request.
+11) Expect it to return a proverb containing your name.
+12) Try different scenarios to test it fully.
+
+JokeClient and JokeClientAdmin can connect to a JokeServer running on a different machine by specifying the hostname or ip address
+of the server as the command line parameter at client startup (e.g. for machine my_host_name at ip address 192.168.1.42):
+java JokeClient my_host_name
+or
+java JokeClient 192.168.1.42
+The JokeClientAdmin can connect from a remote server using the same mechanism.
+
+Included Files:
+ a. checklist-joke.html
+ b. InetServer.java
+ c. InetClient.java
+ d. JokeServer.java
+ e. JokeClient.java
+ f. JokeClientAdmin.java
+ g. JokeInput.txt
+ h. JokeOutput.txt
+
+Notes:
+This saves state persistently using Java serialization. Expect JokeServer to create a file named UsersState.ser
+Significant effort was put into writing thread-safe code but I'm not certain I got it all correct.
+
+----------------------------------------------------------*/
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
