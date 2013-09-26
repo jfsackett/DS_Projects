@@ -46,7 +46,9 @@ Included Files:
  h. JokeOutput.txt
 
 Notes:
-This saves state persistently using Java serialization. Expect JokeServer to create a file named UsersState.ser
+JokeServer saves users' state persistently using Java serialization. Expect JokeServer to create a file named UsersState.ser
+Because users' state is persistently maintained, the best way to start a fresh test is to use a brand new Login Id
+ or by deleting the UsersState.ser file before starting JokeServer.
 Significant effort was put into writing thread-safe code but I'm not certain I got it all correct.
 
 ----------------------------------------------------------*/

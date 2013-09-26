@@ -1,0 +1,113 @@
+########## Annotations appear like this and are not part of the actual output.
+C:\Temp\test>java JokeClient
+Joe Sackett's Joke Client.
+Using server: localhost:4121
+Enter your unique client Login Id (hint: your email adddress): joseph@sackett.com
+Enter your Name: Joe
+D. Joe, The things my wife buys at auctions are keeping me baroque.  -- Peter De Vries
+Would you like another ([Y]/N): y
+B. Joe, One man's Mede is another man's Persian.  -- George S. Kaufman
+Would you like another ([Y]/N): y
+C. Joe, When shooting elephants in Africa, I found the tusks very difficult to remove, but in Alabama the Tuscaloosa.  -- Groucho Marx
+Would you like another ([Y]/N): y
+E. Joe, Hanging is too good for a man who makes puns, he ought to be drawn and quoted.  -- Fred Allen
+Would you like another ([Y]/N): y
+A. Joe, As a physician, I am grateful for small fevers.  -- Oliver Wendell Holmes
+########## Random set of five jokes complete.
+Would you like another ([Y]/N): y
+E. Joe, Hanging is too good for a man who makes puns, he ought to be drawn and quoted.  -- Fred Allen
+Would you like another ([Y]/N): y
+A. Joe, As a physician, I am grateful for small fevers.  -- Oliver Wendell Holmes
+Would you like another ([Y]/N): y
+B. Joe, One man's Mede is another man's Persian.  -- George S. Kaufman
+Would you like another ([Y]/N): y
+C. Joe, When shooting elephants in Africa, I found the tusks very difficult to remove, but in Alabama the Tuscaloosa.  -- Groucho Marx
+Would you like another ([Y]/N): y
+D. Joe, The things my wife buys at auctions are keeping me baroque.  -- Peter De Vries
+########## Random set of five jokes complete.
+Would you like another ([Y]/N): y
+C. Joe, Do not overrate what you have received, nor envy others. He who envies others does not obtain peace of mind.  -- Buddha
+Would you like another ([Y]/N): y
+E. Joe, The tongue like a sharp knife... Kills without drawing blood.  -- Buddha
+Would you like another ([Y]/N): y
+D. Joe, Holding on to anger is like grasping a hot coal with the intent of throwing it at someone else; you are the one who gets burned.  -- Buddha
+Would you like another ([Y]/N): y
+A. Joe, It is better to conquer yourself than to win a thousand battles. Then the victory is yours. It cannot be taken from you, not by angels or by demons, heaven or hell.  -- Buddha
+Would you like another ([Y]/N): y
+B. Joe, Thousands of candles can be lighted from a single candle, and the life of the candle will not be shortened. Happiness never decreases by being shared.  -- Buddha
+########## Random set of five proverbs complete.
+Would you like another ([Y]/N): y
+A. Joe, It is better to conquer yourself than to win a thousand battles. Then the victory is yours. It cannot be taken from you, not by angels or by demons, heaven or hell.  -- Buddha
+Would you like another ([Y]/N): y
+D. Joe, Holding on to anger is like grasping a hot coal with the intent of throwing it at someone else; you are the one who gets burned.  -- Buddha
+Would you like another ([Y]/N): y
+E. Joe, The tongue like a sharp knife... Kills without drawing blood.  -- Buddha
+Would you like another ([Y]/N): y
+C. Joe, Do not overrate what you have received, nor envy others. He who envies others does not obtain peace of mind.  -- Buddha
+Would you like another ([Y]/N): y
+B. Joe, Thousands of candles can be lighted from a single candle, and the life of the candle will not be shortened. Happiness never decreases by being shared.  -- Buddha
+########## Random set of five proverbs complete.
+########## Begin interleave test. Starting in proverb mode.
+Would you like another ([Y]/N): y
+B. Joe, Thousands of candles can be lighted from a single candle, and the life of the candle will not be shortened. Happiness never decreases by being shared.  -- Buddha
+Would you like another ([Y]/N): y
+A. Joe, It is better to conquer yourself than to win a thousand battles. Then the victory is yours. It cannot be taken from you, not by angels or by demons, heaven or hell.  -- Buddha
+Would you like another ([Y]/N): y
+D. Joe, Holding on to anger is like grasping a hot coal with the intent of throwing it at someone else; you are the one who gets burned.  -- Buddha
+########## Three random proverbs (B, A, D) returned.
+########## Switch to joke mode.
+Would you like another ([Y]/N): y
+C. Joe, When shooting elephants in Africa, I found the tusks very difficult to remove, but in Alabama the Tuscaloosa.  -- Groucho Marx
+Would you like another ([Y]/N): y
+E. Joe, Hanging is too good for a man who makes puns, he ought to be drawn and quoted.  -- Fred Allen
+Would you like another ([Y]/N): y
+D. Joe, The things my wife buys at auctions are keeping me baroque.  -- Peter De Vries
+Would you like another ([Y]/N): y
+B. Joe, One man's Mede is another man's Persian.  -- George S. Kaufman
+########## Four random jokes (C, E, D, B) returned.
+########## Switch to maintenance mode.
+Would you like another ([Y]/N): y
+Server is undergoing maintenance. Please try again later.
+Would you like another ([Y]/N): y
+Server is undergoing maintenance. Please try again later.
+########## Switch to joke mode.
+Would you like another ([Y]/N): y
+A. Joe, As a physician, I am grateful for small fevers.  -- Oliver Wendell Holmes
+########## Fifth joke in set returned (A).
+########## New joke set started.
+Would you like another ([Y]/N): y
+A. Joe, As a physician, I am grateful for small fevers.  -- Oliver Wendell Holmes
+Would you like another ([Y]/N): y
+E. Joe, Hanging is too good for a man who makes puns, he ought to be drawn and quoted.  -- Fred Allen
+Would you like another ([Y]/N): y
+B. Joe, One man's Mede is another man's Persian.  -- George S. Kaufman
+########## Three random jokes (A, E, B) returned.
+########## Switch to proverb mode.
+Would you like another ([Y]/N): y
+E. Joe, The tongue like a sharp knife... Kills without drawing blood.  -- Buddha
+Would you like another ([Y]/N): y
+C. Joe, Do not overrate what you have received, nor envy others. He who envies others does not obtain peace of mind.  -- Buddha
+########## Last two proverbs in set returned (E, C).
+########## New proverb set started.
+Would you like another ([Y]/N): y
+C. Joe, Do not overrate what you have received, nor envy others. He who envies others does not obtain peace of mind.  -- Buddha
+Would you like another ([Y]/N): y
+D. Joe, Holding on to anger is like grasping a hot coal with the intent of throwing it at someone else; you are the one who gets burned.  -- Buddha
+########## Two random proverbs (C, D) returned.
+########## Switch to joke mode.
+Would you like another ([Y]/N): y
+D. Joe, The things my wife buys at auctions are keeping me baroque.  -- Peter De Vries
+Would you like another ([Y]/N): y
+C. Joe, When shooting elephants in Africa, I found the tusks very difficult to remove, but in Alabama the Tuscaloosa.  -- Groucho Marx
+########## Last two jokes in set returned (D, C).
+########## Switch to proverb mode.
+Would you like another ([Y]/N): y
+B. Joe, Thousands of candles can be lighted from a single candle, and the life of the candle will not be shortened. Happiness never decreases by being shared.  -- Buddha
+Would you like another ([Y]/N): y
+E. Joe, The tongue like a sharp knife... Kills without drawing blood.  -- Buddha
+Would you like another ([Y]/N): y
+A. Joe, It is better to conquer yourself than to win a thousand battles. Then the victory is yours. It cannot be taken from you, not by angels or by demons, heaven or hell.  -- Buddha
+########## Last three proverbs in set returned (B, E, A).
+########## Interleave test successfully completed.
+Would you like another ([Y]/N): n
+I hope you got some laughs and wisdom. Goodbye.
