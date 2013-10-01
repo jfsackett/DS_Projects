@@ -58,6 +58,8 @@ import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * This server listens for processes connections from web browser clients.
@@ -135,11 +137,13 @@ public class MyWebServer {
 				reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 				writer = new PrintStream(socket.getOutputStream());
 
-				// Read input from client via socket.
-				String input;
-				while ((input = reader.readLine()) != null) {
-				
-				System.out.println(input);
+				// Read all input from web browser via socket.
+				List<String> input = new ArrayList<String>();
+				while (reader.ready()) {
+					// Read line by line & save in list.
+					String line = reader.readLine();
+					input.add(line);
+					System.out.println(line);
 				}
 				writer.println("Receiving 5 over 5.");
 			} catch (IOException ex) {
