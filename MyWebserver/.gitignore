@@ -1,0 +1,12 @@
+# ignore all bin directories
+# matches "bin" in any subfolder
+bin/
+
+# ignore all target directories
+target/
+
+# ignore metadata
+.metadata
+
+# ignore serialized output files
+*.ser
