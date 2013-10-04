@@ -7,3 +7,17 @@ Accept-Encoding: gzip, deflate
 Connection: keep-alive
 Cache-Control: max-age=0
 
+
+
+
+HTTP/1.1 200 OK
+Date: Thu, 03 Oct 2013 19:52:09 GMT
+Server: Apache/2.2.3 (Red Hat)
+Last-Modified: Fri, 16 Sep 2005 18:08:50 GMT
+ETag: "421142-2f-400e77c517080"
+Accept-Ranges: bytes
+Content-Length: 47
+Content-Type: text/plain
+Connection: close
+
+This is Elliott's dog file on condor and hawk.

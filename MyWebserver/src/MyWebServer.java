@@ -53,13 +53,20 @@ Significant effort was put into writing thread-safe code but I'm not certain I g
 
 ----------------------------------------------------------*/
 import java.io.BufferedReader;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.PrintStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.StringTokenizer;
 
 /**
  * This server listens for processes connections from web browser clients.
@@ -70,15 +77,70 @@ import java.util.List;
 public class MyWebServer {
 	/** Web Server port to bind. */
 	private static final int PORT = 2540;
-		
+	
 	/** Relative URL for CGI emulation. */
 	private static final String CGI_CALL = "/cgi/addnums.fake-cgi";
 		
 	/** Relative URL for server shutdown. */
 	private static final String SHUTDOWN = "/tear_down_the_wall";
 		
+	/** CRLF */
+	private static final String CRLF = "\r\n";
+	
+	/** GET */
+	private static final String GET = "GET";
+	
+	/** OK Response Code. */
+	private static final int OK = 200;
+			
+	/** NOT FOUND Response Code. */
+	private static final int NOT_FOUND = 404;
+			
+	/** NO RESPONSE Response Code. */
+	private static final int NO_RESPONSE = 204;
+			
+	/** BAD_REQUEST Response Code. */
+	private static final int BAD_REQUEST = 400;
+			
+	/** FORBIDDEN Response Code. */
+	private static final int FORBIDDEN = 403;
+			
+	/** Buffer Size. */
+	private static final int BUFFER_SIZE = 1000;
+	
+	/** File extension to Mime type map. */
+	private static Map<String,String> mimeTypes = new HashMap<String,String>();
+		
+	/** Code to Response string map. */
+	private static Map<Integer,String> responses = new HashMap<Integer,String>();
+		
 	/** Global mode for the server. Thread safe. */
 	private static ServerState serverState = new ServerState();
+	
+	/** Static block run when class loaded. */
+	static {
+		// Add supported Mime types here.
+		mimeTypes.put("txt", "text/plain");
+		mimeTypes.put("log", "text/plain");
+		mimeTypes.put("htm", "text/html");
+		mimeTypes.put("html", "text/html");
+		mimeTypes.put("js", "application/javascript");
+		mimeTypes.put("pdf", "application/pdf");
+		mimeTypes.put("zip", "application/zip");
+		mimeTypes.put("gif", "image/gif");
+		mimeTypes.put("jpeg", "image/jpeg");
+		mimeTypes.put("jpg", "image/jpeg");
+		mimeTypes.put("png", "image/png");
+		mimeTypes.put("css", "text/css");
+		mimeTypes.put("ico", "image/x.icon");
+
+		// Add HTTP responses here.
+		responses.put(OK, "OK");
+		responses.put(NOT_FOUND, "Not Found");
+		responses.put(NO_RESPONSE, "No Response");
+		responses.put(BAD_REQUEST, "Bad Request");
+		responses.put(FORBIDDEN, "Forbidden");
+	}
 	
 	/**
 	 * Main Web Server Server program.
@@ -126,16 +188,18 @@ public class MyWebServer {
 
 		/**
 		 * Method to execute when thread is spawned.
+		 * Processes incoming HTTP request.
 		 */
 		@Override
 		public void run() {
 			System.out.println("Spawning worker to process HTTP request.");
 			BufferedReader reader =  null;
-			PrintStream writer = null;
+			DataOutputStream writer = null;
 			try {
 				// Get I/O streams from the socket.
 				reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-				writer = new PrintStream(socket.getOutputStream());
+//				writer = new PrintStream(socket.getOutputStream());
+				writer = new DataOutputStream(socket.getOutputStream());
 
 				// Read all input from web browser via socket.
 				List<String> input = new ArrayList<String>();
@@ -145,7 +209,15 @@ public class MyWebServer {
 					input.add(line);
 					System.out.println(line);
 				}
-				writer.println("Receiving 5 over 5.");
+				
+				// Process request.
+				if (input.size() > 0) {
+					respondToRequest(input.get(0), writer);
+				}
+				else {
+		    		writeError(BAD_REQUEST, "No Request Received.", writer);
+				}
+				
 			} catch (IOException ex) {
 				System.out.println(ex);
 			}
@@ -154,12 +226,129 @@ public class MyWebServer {
 					try {reader.close();} catch (IOException ex) {}
 				}
 				if (writer != null) {
-					writer.close();
+					try{writer.close();} catch (IOException ex) {}
 				}
 				if (socket != null) {
 					try {socket.close();} catch (IOException ex) {}
 				}
 			}
+		}
+		
+		private static void respondToRequest(String request, DataOutputStream writer) throws IOException {
+			// Validate request
+	    	StringTokenizer toker = new StringTokenizer(request, " ");
+	    	List<String> tokens = new ArrayList<String>(); 
+	    	while (toker.hasMoreTokens()) {
+	    		tokens.add(toker.nextToken());
+	    	}
+	    	if (tokens.size() < 3 || !tokens.get(0).equalsIgnoreCase(GET)) {
+	    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
+	    		return;
+	    	}
+	    	
+	    	// Check for dummy CGI request.
+	    	if (tokens.get(1).startsWith(CGI_CALL)) {
+	    		processCgiRequest(tokens.get(1));
+	    	}
+	    	
+	    	// Tie URL to local directory & check for shenanigans.
+	    	String url = "." + tokens.get(1);
+	    	if (url.contains("..")) {
+	    		writeError(FORBIDDEN, "You don't have permission to access " + tokens.get(1) + " on this server.", writer);
+	    	}
+	    	
+	    	// Does requested file exist?
+			File file = new File(url);
+			if (!file.exists()) {
+	    		writeError(NOT_FOUND, "The requested URL " + tokens.get(1) + " was not found on this server.", writer);
+	    		return;
+			}
+			
+			// Dispatch based on file, directory or CGI request.
+			if (file.isFile()) {
+	    		processFileRequest(file, writer);
+			}
+			else if (file.isDirectory()) {
+	    		processDirRequest(file);
+			}
+			else {
+	    		writeError(NOT_FOUND, "The requested URL " + tokens.get(1) + " was not found on this server.", writer);
+	    		return;
+			}
+		}
+		
+		private static void writeError(int code, String error, DataOutputStream writer) throws IOException {
+			// Build response HTML.
+			StringBuilder responseBuilder = new StringBuilder();
+			responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
+			responseBuilder.append("<html><head>").append(CRLF);
+			responseBuilder.append("<title>").append(code).append(' ').append(responses.get(code)).append("</title>").append(CRLF);
+			responseBuilder.append("</head><body>").append(CRLF);
+			responseBuilder.append("<html><head>").append(CRLF);
+			responseBuilder.append("<h1>").append(responses.get(code)).append("</h1>").append(CRLF);
+			responseBuilder.append("<p>").append(error).append("</p>").append(CRLF);
+			responseBuilder.append("</body></html>").append(CRLF);
+			String response = responseBuilder.toString();
+			
+			writer.writeBytes("HTTP/1.1 " + code + ' ' + responses.get(code) + CRLF);
+			writer.writeBytes("Content-Length: " + response.length() + CRLF);
+			writer.writeBytes("Content-Type: " + mimeTypes.get("html") + CRLF);
+			writer.writeBytes("Connection: close" + CRLF + CRLF);
+			writer.writeBytes(response);
+			writer.writeBytes(CRLF + CRLF);
+			writer.flush();
+		}
+		
+		private static void writeOkHeader(long length, String mimeType, DataOutputStream writer) throws IOException {
+			writer.writeBytes("HTTP/1.1 200 OK" + CRLF);
+			writer.writeBytes("Content-Length: " + length + CRLF);
+			writer.writeBytes("Content-Type: " + mimeType + CRLF);
+			writer.writeBytes("Connection: close" + CRLF + CRLF);
+		}
+		
+		private static void processFileRequest(File file, DataOutputStream writer) throws IOException {
+			writeOkHeader(file.length(), mimeTypes.get(file.getName().substring(file.getName().lastIndexOf(".")+1).toLowerCase()), writer);
+			InputStream fileReader = null;
+			try {
+				// Open input file & read into 
+				fileReader = new DataInputStream(new FileInputStream(file));
+				// Read and immediately output bytes until done.
+				byte[] buffer = new byte[BUFFER_SIZE];
+				while (fileReader.read(buffer) > 0) {
+					writer.write(buffer);
+				}
+			} catch (IOException ex) {
+				System.out.println(ex);
+			}
+			finally {
+				if (fileReader != null) {
+					try {fileReader.close();} catch (Exception ex) {}
+				}
+				writer.writeBytes(CRLF + CRLF);
+				writer.flush();
+			}
+		}
+		
+		private static String processDirRequest(File file) {
+			String response = null;
+			
+			File[] listOfFiles = file.listFiles(); 
+			for (int i = 0; i < listOfFiles.length; i++) {
+				if (listOfFiles[i].isFile()) {
+					System.out.println("File: " + listOfFiles[i].getName());
+				}
+				else if (listOfFiles[i].isDirectory()) {
+					System.out.println("Dir: " + listOfFiles[i].getName());
+				}
+			}
+			
+			return response;
+		}
+		
+		private static String processCgiRequest(String uri) {
+			String response = null;
+			
+			return response;
 		}
 	}
 
