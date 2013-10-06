@@ -87,6 +87,15 @@ public class MyWebServer {
 	/** Path separator. */
 	private static final char PATH_SEP = File.separator.charAt(0);
 	
+	/** Person parameter name. */
+	private static final String PERSON = "person";
+	
+	/** Number 1 parameter name. */
+	private static final String NUM1 = "num1";
+	
+	/** Number 2 parameter name. */
+	private static final String NUM2 = "num2";
+	
 	/** Backslash file separator? */
 	private static final char SLASH = '/';
 		
@@ -204,7 +213,6 @@ public class MyWebServer {
 			try {
 				// Get I/O streams from the socket.
 				reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-//				writer = new PrintStream(socket.getOutputStream());
 				writer = new DataOutputStream(socket.getOutputStream());
 
 				// Read all input from web browser via socket.
@@ -255,7 +263,6 @@ public class MyWebServer {
 	    	
 	    	// Check for dummy CGI request.
 	    	if (tokens.get(1).startsWith(CGI_CALL)) {
-//	    		writeError(OK, "ok.", writer);
 	    		processCgiRequest(tokens.get(1), writer);
 	    		return;
 	    	}
@@ -343,8 +350,6 @@ public class MyWebServer {
 			currDir = (currDir.length() == 0) ? "/" : currDir;
 			String parentDir = (dir.getParent() == null) ? "" : dir.getParent().substring(1).replace(PATH_SEP, SLASH);
 			parentDir = (parentDir.length() == 0 && currDir.length() > 1) ? "/" : parentDir;
-			System.out.println("Path2: " + currDir);
-			System.out.println("Parent2: " + parentDir);
 			StringBuilder responseBuilder = new StringBuilder();
 			responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
 			responseBuilder.append("<html><head>").append(CRLF);
@@ -382,7 +387,62 @@ public class MyWebServer {
 		
 		private static void processCgiRequest(String request, DataOutputStream writer) throws IOException {
 			System.out.println(request);
-    		writeError(OK, "ok.", writer);
+			// /cgi/addnums.fake-cgi?person=YourName&num1=4&num2=5
+			String params;
+			if (!request.contains("?") || (params = request.substring(request.indexOf('?')+1)) == null || params.length() == 0) {
+	    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
+	    		return;
+			}
+			
+	    	StringTokenizer toker = new StringTokenizer(params, "&");
+	    	Map<String,String> paramMap = new HashMap<String,String>(); 
+	    	while (toker.hasMoreTokens()) {
+	    		String token, name, value;
+	    		token = toker.nextToken();
+				if (!token.contains("=") || (name = token.substring(0, token.indexOf('='))) == null || name.length() == 0
+						|| (value = token.substring(token.indexOf('=')+1)) == null || value.length() == 0) {
+		    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
+		    		return;
+				}
+	    		paramMap.put(name, value);
+	    		System.out.println(name + '=' + value);
+	    	}
+	    	if (paramMap.size() < 3) {
+	    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
+	    		return;
+	    	}
+	    	
+	    	String person;
+	    	int n1, n2, result;
+	    	try {
+	    		String num1, num2;
+	    		if ((person = paramMap.get(PERSON)) == null || (num1 = paramMap.get(NUM1)) == null || (num2 = paramMap.get(NUM2)) == null) {
+		    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
+		    		return;
+		    	}
+	    		n1 = Integer.parseInt(num1);
+	    		n2 = Integer.parseInt(num2);
+	    		result = n1 + n2;
+	    	}
+	    	catch (NumberFormatException ex) {
+	    		System.out.println(ex);
+	    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
+	    		return;
+	    	}
+	    	
+			StringBuilder responseBuilder = new StringBuilder();
+			responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
+			responseBuilder.append("<html><head>").append(CRLF);
+			responseBuilder.append("<title>").append("Addnums Mock CGI").append("</title>").append(CRLF);
+			responseBuilder.append("</head><body>").append(CRLF);
+			responseBuilder.append("<h1>").append("Addnums Mock CGI").append("</h1>").append(CRLF);
+			responseBuilder.append("<p>").append("Dear ").append(person).append(", the sum of ").append(n1).append(" and ").append(n2).append(" is ").append(result).append(".</p>").append(CRLF);
+			responseBuilder.append("</body></html>").append(CRLF);
+			String response = responseBuilder.toString();
+			
+			writeOkHeader(response.length(), mimeTypes.get("html"), writer);
+			writer.writeBytes(response);
+			writer.flush();
 		}
 	}
 
