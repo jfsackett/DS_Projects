@@ -83,6 +83,12 @@ public class MyWebServer {
 		
 	/** Relative URL for server shutdown. */
 	private static final String SHUTDOWN = "/tear_down_the_wall";
+	
+	/** Path separator. */
+	private static final char PATH_SEP = File.separator.charAt(0);
+	
+	/** Backslash file separator? */
+	private static final char SLASH = '/';
 		
 	/** CRLF */
 	private static final String CRLF = "\r\n";
@@ -220,6 +226,7 @@ public class MyWebServer {
 				
 			} catch (IOException ex) {
 				System.out.println(ex);
+				ex.printStackTrace();
 			}
 			finally {
 				if (reader != null) {
@@ -248,13 +255,16 @@ public class MyWebServer {
 	    	
 	    	// Check for dummy CGI request.
 	    	if (tokens.get(1).startsWith(CGI_CALL)) {
-	    		processCgiRequest(tokens.get(1));
+//	    		writeError(OK, "ok.", writer);
+	    		processCgiRequest(tokens.get(1), writer);
+	    		return;
 	    	}
 	    	
 	    	// Tie URL to local directory & check for shenanigans.
 	    	String url = "." + tokens.get(1);
 	    	if (url.contains("..")) {
 	    		writeError(FORBIDDEN, "You don't have permission to access " + tokens.get(1) + " on this server.", writer);
+	    		return;
 	    	}
 	    	
 	    	// Does requested file exist?
@@ -269,7 +279,7 @@ public class MyWebServer {
 	    		processFileRequest(file, writer);
 			}
 			else if (file.isDirectory()) {
-	    		processDirRequest(file);
+	    		processDirRequest(file, writer);
 			}
 			else {
 	    		writeError(NOT_FOUND, "The requested URL " + tokens.get(1) + " was not found on this server.", writer);
@@ -284,7 +294,6 @@ public class MyWebServer {
 			responseBuilder.append("<html><head>").append(CRLF);
 			responseBuilder.append("<title>").append(code).append(' ').append(responses.get(code)).append("</title>").append(CRLF);
 			responseBuilder.append("</head><body>").append(CRLF);
-			responseBuilder.append("<html><head>").append(CRLF);
 			responseBuilder.append("<h1>").append(responses.get(code)).append("</h1>").append(CRLF);
 			responseBuilder.append("<p>").append(error).append("</p>").append(CRLF);
 			responseBuilder.append("</body></html>").append(CRLF);
@@ -295,7 +304,7 @@ public class MyWebServer {
 			writer.writeBytes("Content-Type: " + mimeTypes.get("html") + CRLF);
 			writer.writeBytes("Connection: close" + CRLF + CRLF);
 			writer.writeBytes(response);
-			writer.writeBytes(CRLF + CRLF);
+			writer.writeBytes(CRLF);
 			writer.flush();
 		}
 		
@@ -324,31 +333,56 @@ public class MyWebServer {
 				if (fileReader != null) {
 					try {fileReader.close();} catch (Exception ex) {}
 				}
-				writer.writeBytes(CRLF + CRLF);
+//				writer.writeBytes(CRLF);
 				writer.flush();
 			}
 		}
 		
-		private static String processDirRequest(File file) {
-			String response = null;
-			
-			File[] listOfFiles = file.listFiles(); 
-			for (int i = 0; i < listOfFiles.length; i++) {
-				if (listOfFiles[i].isFile()) {
-					System.out.println("File: " + listOfFiles[i].getName());
+		private static void processDirRequest(File dir, DataOutputStream writer) throws IOException {
+			String currDir = dir.getPath().substring(1).replace(PATH_SEP, SLASH);
+			currDir = (currDir.length() == 0) ? "/" : currDir;
+			String parentDir = (dir.getParent() == null) ? "" : dir.getParent().substring(1).replace(PATH_SEP, SLASH);
+			parentDir = (parentDir.length() == 0 && currDir.length() > 1) ? "/" : parentDir;
+			System.out.println("Path2: " + currDir);
+			System.out.println("Parent2: " + parentDir);
+			StringBuilder responseBuilder = new StringBuilder();
+			responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
+			responseBuilder.append("<html><head>").append(CRLF);
+			responseBuilder.append("<title>").append("Index of ").append(currDir).append("</title>").append(CRLF);
+			responseBuilder.append("</head><body>").append(CRLF);
+			responseBuilder.append("<h1>").append("Index of ").append(currDir).append("</h1>").append(CRLF);
+			responseBuilder.append("<pre>").append(CRLF);
+			if (parentDir.length() > 0) {
+				responseBuilder.append("[D]  ");
+				responseBuilder.append("<a href=\"").append(parentDir).append("\">");
+				responseBuilder.append("Parent Directory</a>").append(CRLF);
+			}
+			File[] files = dir.listFiles(); 
+			for (int i = 0; i < files.length; i++) {
+				if (files[i].isFile()) {
+					responseBuilder.append("[F]  ");
+					responseBuilder.append("<a href=\"").append((dir.getParent() == null) ? "" : dir.getParent().substring(dir.getParent().lastIndexOf(".")+1)).append(dir.getName()).append('/').append(files[i].getName()).append("\">");
+					responseBuilder.append(files[i].getName()).append("</a>").append(CRLF);
 				}
-				else if (listOfFiles[i].isDirectory()) {
-					System.out.println("Dir: " + listOfFiles[i].getName());
+				else if (files[i].isDirectory()) {
+					responseBuilder.append("[D]  ");
+					responseBuilder.append("<a href=\"").append((dir.getParent() == null) ? "" : dir.getParent().substring(dir.getParent().lastIndexOf(".")+1)).append(dir.getName()).append('/').append(files[i].getName()).append("\">");
+					responseBuilder.append(files[i].getName()).append("</a>").append(CRLF);
 				}
 			}
+			responseBuilder.append("</pre>").append(CRLF);
+			responseBuilder.append("</body></html>").append(CRLF);			
 			
-			return response;
+			String response = responseBuilder.toString();
+			writeOkHeader(response.length(), mimeTypes.get("html"), writer);
+			writer.writeBytes(response);
+			writer.writeBytes(CRLF);
+			writer.flush();
 		}
 		
-		private static String processCgiRequest(String uri) {
-			String response = null;
-			
-			return response;
+		private static void processCgiRequest(String request, DataOutputStream writer) throws IOException {
+			System.out.println(request);
+    		writeError(OK, "ok.", writer);
 		}
 	}
 

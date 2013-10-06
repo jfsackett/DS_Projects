@@ -10,3 +10,11 @@ target/
 
 # ignore serialized output files
 *.ser
+
+# test files
+**/*.docx
+**/*.pdf
+**/*.zip
+**/*.jpg
+**/*.jpeg
+**/*.gif
