@@ -1,7 +1,7 @@
 /*--------------------------------------------------------
 
 Joseph Sackett
-September 25, 2013
+October 7, 2013
 
 Developed and tested with JDK 1.7.0_40.
 
@@ -11,45 +11,27 @@ From a command prompt in that directory, execute:
 javac *.java
 
 Execution Instructions:
-JokeServer works with JokeClient and JokeClientAdmin but JokeServer should be executed first.
+MyWebServer emulates a real web server, except it runs on port 2540 and supports the Firefox web browser.
 1) From a command prompt in the same directory as the build, execute:
-java JokeServer
-2) Open another command prompt in the same directory as the build, execute:
-java JokeClient
-3) Enter your email address at the prompt.
-4) Enter your name at the prompt.
-5) Expect it to return a joke containing your name.
-6) Decide whether to have it give you another joke or proverb.
-7) Open another command prompt in the same directory as the build, execute:
-java JokeClientAdmin
-8) Read the usage options to see what the Admin can do.
-9) Type: P and hit return to put the JokeServer in proverb mode.
-10) Return to JokeClient and make another request.
-11) Expect it to return a proverb containing your name.
-12) Try different scenarios to test it fully.
+java MyWebServer
+2) Open Firefox and type this into the browser line:
+http://localhost:2540/
+3) Expect it to return a listing of the directory where the web server program was executed.
+4) Browse through directories or click on a file to have it display in browser, specific to its mime type.
+5) Try many different types of files and directories to test it fully.
 
-JokeClient and JokeClientAdmin can connect to a JokeServer running on a different machine by specifying the hostname or ip address
-of the server as the command line parameter at client startup (e.g. for machine my_host_name at ip address 192.168.1.42):
-java JokeClient my_host_name
-or
-java JokeClient 192.168.1.42
-The JokeClientAdmin can connect from a remote server using the same mechanism.
+A browser from a different machine can perform all of the same actions as long as the firewall rules permit port 2540.
+To test this, substitute the IP address or hostname of the server running MyWebServer for the localhost in the above instructions.
 
 Included Files:
- a. checklist-joke.html
- b. InetServer.java
- c. InetClient.java
- d. JokeServer.java
- e. JokeClient.java
- f. JokeClientAdmin.java
- g. JokeInput.txt
- h. JokeOutput.txt
+ a. checklist-mywebserver.html
+ b. MyWebServer.java
+ c. http-streams.txt
+ d. serverlog.txt
 
 Notes:
-JokeServer saves users' state persistently using Java serialization. Expect JokeServer to create a file named UsersState.ser
-Because users' state is persistently maintained, the best way to start a fresh test is to use a brand new Login Id
- or by deleting the UsersState.ser file before starting JokeServer.
-Significant effort was put into writing thread-safe code but I'm not certain I got it all correct.
+Dynamic mime-type mapping.
+Handles binary data.
 
 ----------------------------------------------------------*/
 import java.io.BufferedReader;
@@ -71,7 +53,7 @@ import java.util.StringTokenizer;
 /**
  * This server listens for processes connections from web browser clients.
  * It processes HTTP GET requests for specific files and directory listings.
- * It also processes a form submit by emulates a CGI call.  
+ * It also processes a form submit by emulating a CGI call.  
  * @author Joseph Sackett
  */
 public class MyWebServer {
@@ -81,9 +63,6 @@ public class MyWebServer {
 	/** Relative URL for CGI emulation. */
 	private static final String CGI_CALL = "/cgi/addnums.fake-cgi";
 		
-	/** Relative URL for server shutdown. */
-	private static final String SHUTDOWN = "/tear_down_the_wall";
-	
 	/** Path separator. */
 	private static final char PATH_SEP = File.separator.charAt(0);
 	
@@ -123,32 +102,17 @@ public class MyWebServer {
 	/** Buffer Size. */
 	private static final int BUFFER_SIZE = 1000;
 	
+	/** File containing file extension to mime type mappings. */
+	private static final String MIME_INPUT_FILE = "MimeTypes.txt";
+	
 	/** File extension to Mime type map. */
 	private static Map<String,String> mimeTypes = new HashMap<String,String>();
 		
 	/** Code to Response string map. */
 	private static Map<Integer,String> responses = new HashMap<Integer,String>();
 		
-	/** Global mode for the server. Thread safe. */
-	private static ServerState serverState = new ServerState();
-	
 	/** Static block run when class loaded. */
 	static {
-		// Add supported Mime types here.
-		mimeTypes.put("txt", "text/plain");
-		mimeTypes.put("log", "text/plain");
-		mimeTypes.put("htm", "text/html");
-		mimeTypes.put("html", "text/html");
-		mimeTypes.put("js", "application/javascript");
-		mimeTypes.put("pdf", "application/pdf");
-		mimeTypes.put("zip", "application/zip");
-		mimeTypes.put("gif", "image/gif");
-		mimeTypes.put("jpeg", "image/jpeg");
-		mimeTypes.put("jpg", "image/jpeg");
-		mimeTypes.put("png", "image/png");
-		mimeTypes.put("css", "text/css");
-		mimeTypes.put("ico", "image/x.icon");
-
 		// Add HTTP responses here.
 		responses.put(OK, "OK");
 		responses.put(NOT_FOUND, "Not Found");
@@ -160,23 +124,24 @@ public class MyWebServer {
 	/**
 	 * Main Web Server Server program.
 	 * - Initializes global state
-	 * - Loop until shutdown, spawning workers for each connection. 
+	 * - Loop continually, spawning workers for each connection.
 	 */
 	public static void main(String[] args) {
 		System.out.println("Joe Sackett's Web Server.");
 		System.out.println("Web Server Port: " + PORT);
 		
+		// Load Initial Mime Types.
+		loadMimeTypesFile();
+		
 		ServerSocket serverSocket = null;
 		try {
 			serverSocket = new ServerSocket(PORT);
-			while (serverState.isControlSwitch()) {
+			while (true) {
 				// Wait for the next browser connection.
 				Socket socket = serverSocket.accept();
-				// Check for shutdown preceding client connection.
-				if (serverState.isControlSwitch()) {
-					// Spawn thread, along with Joke or Admin strategy.
-					new Thread(new Worker(socket)).start();
-				}
+
+				// Spawn thread to process request.
+				new Thread(new Worker(socket)).start();
 			}
 		}
 		catch (IOException ex) {
@@ -266,7 +231,7 @@ public class MyWebServer {
 	    		processCgiRequest(tokens.get(1), writer);
 	    		return;
 	    	}
-	    	
+	    		    	
 	    	// Tie URL to local directory & check for shenanigans.
 	    	String url = "." + tokens.get(1);
 	    	if (url.contains("..")) {
@@ -323,7 +288,22 @@ public class MyWebServer {
 		}
 		
 		private static void processFileRequest(File file, DataOutputStream writer) throws IOException {
-			writeOkHeader(file.length(), mimeTypes.get(file.getName().substring(file.getName().lastIndexOf(".")+1).toLowerCase()), writer);
+			// Parse file name for extension.
+			String fileName = file.getName();
+			String fileExtension = fileName.substring(fileName.lastIndexOf('.')+1).toLowerCase();
+			String mimeType = mimeTypes.get(fileExtension);
+			// If no mime type for this extension, reload mime type file in case it was added.
+			if (mimeType == null) {
+				loadMimeTypesFile();
+				mimeType = mimeTypes.get(fileExtension);
+				// If still missing mime type, return error.
+				if (mimeType == null) {
+		    		writeError(BAD_REQUEST, "No Mime Type for this request: " + fileName, writer);
+		    		return;
+				}
+			}
+			
+			writeOkHeader(file.length(), mimeTypes.get(fileExtension), writer);
 			InputStream fileReader = null;
 			try {
 				// Open input file & read into 
@@ -340,7 +320,6 @@ public class MyWebServer {
 				if (fileReader != null) {
 					try {fileReader.close();} catch (Exception ex) {}
 				}
-//				writer.writeBytes(CRLF);
 				writer.flush();
 			}
 		}
@@ -447,20 +426,58 @@ public class MyWebServer {
 	}
 
 	/**
-	 * Encapsulates the state of the server.
+	 * This loads the MimeTypes.txt file containing all of the mappings between file extension & mime type.
+	 * If the input file does not exist or the file data are invalid, it uses default data so it can still proceed. 
 	 */
-	private static class ServerState {
-		/** Main control switch used for shutdown. */
-		private boolean controlSwitch = true;
+	private static void loadMimeTypesFile() {
+		// Clear old mime types.
+		mimeTypes = new HashMap<String,String>();
 		
-		public synchronized boolean isControlSwitch() {
-			return controlSwitch;
+ 		BufferedReader reader = null;
+		try {
+			// Open input file.
+			reader = new BufferedReader(new InputStreamReader(new FileInputStream(MIME_INPUT_FILE)));
+			// Read each line through the end of the file.
+	        String input;
+			while ((input = reader.readLine()) != null) {
+				// Skip commented lines.
+				if (input == null || input.length() == 0 || input.startsWith("#")) {
+					continue;
+				}
+				
+				// Parse file extension from mime type by [space].
+		    	StringTokenizer toker = new StringTokenizer(input, " ");
+		    	while (toker.countTokens() == 2) {
+					// Add this mime type to global collection.
+					mimeTypes.put(toker.nextToken(), toker.nextToken());
+		    	}
+			}	
+		} catch (IOException ex) {
+			System.out.println(ex);
 		}
-
-		public synchronized void setControlSwitch(boolean controlSwitch) {
-			this.controlSwitch = controlSwitch;
+		finally {
+			if (reader != null) {
+				try {reader.close();} catch (Exception ex) {}
+			}
+		}
+		
+		// If load from file was unsuccessful, load default mappings.
+		if (mimeTypes.isEmpty()) {
+			// Add default Mime types here.
+			mimeTypes.put("txt", "text/plain");
+			mimeTypes.put("log", "text/plain");
+			mimeTypes.put("htm", "text/html");
+			mimeTypes.put("html", "text/html");
+			mimeTypes.put("js", "application/javascript");
+			mimeTypes.put("pdf", "application/pdf");
+			mimeTypes.put("zip", "application/zip");
+			mimeTypes.put("gif", "image/gif");
+			mimeTypes.put("jpeg", "image/jpeg");
+			mimeTypes.put("jpg", "image/jpeg");
+			mimeTypes.put("png", "image/png");
+			mimeTypes.put("css", "text/css");
+			mimeTypes.put("ico", "image/x.icon");
 		}
 	}
 	
-
 }

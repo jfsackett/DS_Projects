@@ -12,9 +12,10 @@ target/
 *.ser
 
 # test files
-**/*.docx
-**/*.pdf
-**/*.zip
-**/*.jpg
-**/*.jpeg
-**/*.gif
+test/
+**.docx
+**.pdf
+**.zip
+**.jpg
+**.jpeg
+**.gif
