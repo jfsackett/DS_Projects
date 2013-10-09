@@ -1,0 +1,58 @@
+Joe Sackett's Web Server.
+Web Server Port: 2540
+##### Get server root.
+Spawning worker to process HTTP request.
+GET / HTTP/1.1
+Returning directory listing: /
+##### Get text file.
+Spawning worker to process HTTP request.
+GET /http-streams.txt HTTP/1.1
+Returning file: http-streams.txt
+##### Get html file.
+Spawning worker to process HTTP request.
+GET /checklist-mywebserver.html HTTP/1.1
+Returning file: checklist-mywebserver.html
+##### Get wml file.
+Spawning worker to process HTTP request.
+GET /example.wml HTTP/1.1
+Returning file: example.wml
+##### Get jpg image file.
+Spawning worker to process HTTP request.
+GET /Wall.jpg HTTP/1.1
+Returning file: Wall.jpg
+##### Get PDF file.
+Spawning worker to process HTTP request.
+GET /Joseph_Sackett_DePaul_MS.pdf HTTP/1.1
+Returning file: Joseph_Sackett_DePaul_MS.pdf
+##### Get zip file.
+Spawning worker to process HTTP request.
+GET /NetworkLabs.zip HTTP/1.1
+Returning file: NetworkLabs.zip
+##### Get subdirectory /test via link in / directory listing.
+Spawning worker to process HTTP request.
+GET /test HTTP/1.1
+Returning directory listing: /test
+##### Get html file in subdirectory via link in listing.
+Spawning worker to process HTTP request.
+GET /test/check.html HTTP/1.1
+Returning file: check.html
+##### Get subdirectory /test/test2 via link in /test directory listing.
+Spawning worker to process HTTP request.
+GET /test/test2 HTTP/1.1
+Returning directory listing: /test/test2
+##### Get subdirectory /test/test1 via link in /test directory listing.
+Spawning worker to process HTTP request.
+GET /test/test1 HTTP/1.1
+Returning file: index.html
+##### Get addnums.html containing form.
+Spawning worker to process HTTP request.
+GET /addnums.html HTTP/1.1
+Returning file: addnums.html
+##### Handle mock CGI form submission.
+Spawning worker to process HTTP request.
+GET /cgi/addnums.fake-cgi?person=Joe&num1=11&num2=10 HTTP/1.1
+/cgi/addnums.fake-cgi?person=Joe&num1=11&num2=10
+person=Joe
+num1=11
+num2=10
+CGI addnums- person: Joe  num1: 11  num2: 10  result: 21

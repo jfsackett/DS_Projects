@@ -28,10 +28,16 @@ Included Files:
  b. MyWebServer.java
  c. http-streams.txt
  d. serverlog.txt
+ e. MimeTypes.txt
 
 Notes:
-Dynamic mime-type mapping.
-Handles binary data.
+- Dynamic mime-type mapping using input file (MimeTypes.txt) 
+- Returns binary data (images, PDFs, etc.) 
+- Implements index.html to remove promiscuity of directories.
+- Supports favicon.ico.
+- Has WML mime support but serving files to cell phone is not tested.
+- The addnums form must make a GET submit to: /cgi/addnums.fake-cgi
+  with form fields: person=[string] num1=[integer] num2=[integer]
 
 ----------------------------------------------------------*/
 import java.io.BufferedReader;
@@ -83,6 +89,9 @@ public class MyWebServer {
 	
 	/** GET */
 	private static final String GET = "GET";
+	
+	/** index.html */
+	private static final String INDEX_HTML = "index.html";
 	
 	/** OK Response Code. */
 	private static final int OK = 200;
@@ -182,15 +191,15 @@ public class MyWebServer {
 
 				// Read all input from web browser via socket.
 				List<String> input = new ArrayList<String>();
-				while (reader.ready()) {
+				do {
 					// Read line by line & save in list.
 					String line = reader.readLine();
 					input.add(line);
-					System.out.println(line);
-				}
+				} while (reader.ready()) ;
 				
 				// Process request.
 				if (input.size() > 0) {
+					System.out.println(input.get(0));
 					respondToRequest(input.get(0), writer);
 				}
 				else {
@@ -214,6 +223,9 @@ public class MyWebServer {
 			}
 		}
 		
+		/**
+		 * Process request string & delegate to handler functions.
+		 */
 		private static void respondToRequest(String request, DataOutputStream writer) throws IOException {
 			// Validate request
 	    	StringTokenizer toker = new StringTokenizer(request, " ");
@@ -259,8 +271,12 @@ public class MyWebServer {
 			}
 		}
 		
+		/**
+		 * Writes error code & html back to browser.
+		 */
 		private static void writeError(int code, String error, DataOutputStream writer) throws IOException {
-			// Build response HTML.
+			System.out.println("Returning " + code + " error: " + error);
+			// Build error response HTML.
 			StringBuilder responseBuilder = new StringBuilder();
 			responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
 			responseBuilder.append("<html><head>").append(CRLF);
@@ -280,6 +296,9 @@ public class MyWebServer {
 			writer.flush();
 		}
 		
+		/**
+		 * Writes OK and other output headers for successful response.
+		 */
 		private static void writeOkHeader(long length, String mimeType, DataOutputStream writer) throws IOException {
 			writer.writeBytes("HTTP/1.1 200 OK" + CRLF);
 			writer.writeBytes("Content-Length: " + length + CRLF);
@@ -287,6 +306,9 @@ public class MyWebServer {
 			writer.writeBytes("Connection: close" + CRLF + CRLF);
 		}
 		
+		/**
+		 * Return the contents of a file to the browser.
+		 */
 		private static void processFileRequest(File file, DataOutputStream writer) throws IOException {
 			// Parse file name for extension.
 			String fileName = file.getName();
@@ -303,6 +325,7 @@ public class MyWebServer {
 				}
 			}
 			
+			System.out.println("Returning file: " + file.getName());
 			writeOkHeader(file.length(), mimeTypes.get(fileExtension), writer);
 			InputStream fileReader = null;
 			try {
@@ -324,6 +347,9 @@ public class MyWebServer {
 			}
 		}
 		
+		/**
+		 * Returns a directory listing to the browser.
+		 */
 		private static void processDirRequest(File dir, DataOutputStream writer) throws IOException {
 			String currDir = dir.getPath().substring(1).replace(PATH_SEP, SLASH);
 			currDir = (currDir.length() == 0) ? "/" : currDir;
@@ -344,6 +370,12 @@ public class MyWebServer {
 			File[] files = dir.listFiles(); 
 			for (int i = 0; i < files.length; i++) {
 				if (files[i].isFile()) {
+					// Check for index.html to mask directory listing.
+					if (files[i].getName().equals(INDEX_HTML)) {
+						// Short-circuit directory listing & display index.html.
+						processFileRequest(files[i], writer);
+						return;
+					}
 					responseBuilder.append("[F]  ");
 					responseBuilder.append("<a href=\"").append((dir.getParent() == null) ? "" : dir.getParent().substring(dir.getParent().lastIndexOf(".")+1)).append(dir.getName()).append('/').append(files[i].getName()).append("\">");
 					responseBuilder.append(files[i].getName()).append("</a>").append(CRLF);
@@ -357,6 +389,7 @@ public class MyWebServer {
 			responseBuilder.append("</pre>").append(CRLF);
 			responseBuilder.append("</body></html>").append(CRLF);			
 			
+			System.out.println("Returning directory listing: " + currDir);
 			String response = responseBuilder.toString();
 			writeOkHeader(response.length(), mimeTypes.get("html"), writer);
 			writer.writeBytes(response);
@@ -364,9 +397,11 @@ public class MyWebServer {
 			writer.flush();
 		}
 		
+		/**
+		 * Processes mock CGI request.
+		 */
 		private static void processCgiRequest(String request, DataOutputStream writer) throws IOException {
 			System.out.println(request);
-			// /cgi/addnums.fake-cgi?person=YourName&num1=4&num2=5
 			String params;
 			if (!request.contains("?") || (params = request.substring(request.indexOf('?')+1)) == null || params.length() == 0) {
 	    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
@@ -409,6 +444,7 @@ public class MyWebServer {
 	    		return;
 	    	}
 	    	
+			System.out.println("CGI addnums- person: " + person + "  num1: " + n1 + "  num2: " + n2 + "  result: " + result);
 			StringBuilder responseBuilder = new StringBuilder();
 			responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
 			responseBuilder.append("<html><head>").append(CRLF);
@@ -451,9 +487,10 @@ public class MyWebServer {
 					// Add this mime type to global collection.
 					mimeTypes.put(toker.nextToken(), toker.nextToken());
 		    	}
-			}	
+			}
 		} catch (IOException ex) {
 			System.out.println(ex);
+			System.out.println("Continuing with default Mime Types.");
 		}
 		finally {
 			if (reader != null) {
