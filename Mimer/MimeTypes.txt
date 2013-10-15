@@ -1,0 +1,37 @@
+# Supported mime types. Format MUST be:
+# extension[space]mimetype
+xy1 application/xy1
+txt text/plain
+log text/plain
+htm text/html
+html text/html
+js application/javascript
+pdf application/pdf
+zip application/zip
+gif image/gif
+jpeg image/jpeg
+jpg image/jpeg
+png image/png
+css text/css
+ico image/x.icon
+# MS Office Mime types
+doc application/msword
+dot application/msword
+docx application/vnd.openxmlformats-officedocument.wordprocessingml.document
+dotx application/vnd.openxmlformats-officedocument.wordprocessingml.template
+xls application/vnd.ms-excel
+xlt application/vnd.ms-excel
+xla application/vnd.ms-excel
+xlsx application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+xltx application/vnd.openxmlformats-officedocument.spreadsheetml.template
+ppt application/vnd.ms-powerpoint
+pot application/vnd.ms-powerpoint
+pps application/vnd.ms-powerpoint
+ppa application/vnd.ms-powerpoint
+pptx application/vnd.openxmlformats-officedocument.presentationml.presentation
+potx application/vnd.openxmlformats-officedocument.presentationml.template
+ppsx application/vnd.openxmlformats-officedocument.presentationml.slideshow
+# WML support
+wml text/vnd.wap.wml
+wmls text/vnd.wap.wmlscript
+wbmp image/vnd.wap.wbmp
