@@ -35,6 +35,7 @@ Included Files:
 - BCHandler.java
 - serverlog.txt 
 - checklist-mimer.html
+- MimeTypes.txt <-- Necessary for configuring supported mime types at startup.
 
 ----------------------------------------------------------------------*/
 

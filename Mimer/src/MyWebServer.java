@@ -49,6 +49,7 @@ Included Files:
 - BCHandler.java
 - serverlog.txt 
 - checklist-mimer.html
+- MimeTypes.txt <-- Necessary for configuring supported mime types at startup.
 
 Notes:
 - Dynamic mime-type mapping using input file (MimeTypes.txt) 
@@ -714,6 +715,7 @@ public class MyWebServer {
 			mimeTypes.put("png", "image/png");
 			mimeTypes.put("css", "text/css");
 			mimeTypes.put("ico", "image/x.icon");
+			mimeTypes.put("xyz", "application/xyz");
 		}
 	}
 	
