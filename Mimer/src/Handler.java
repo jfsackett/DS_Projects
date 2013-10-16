@@ -1,10 +1,11 @@
-/* Handler.java 1.0
+/*--------------------------------------------------------
+Handler.java 1.1
 Clark Elliott MIMER shim java example
-with minor modifications & extensive comments by Joseph Sackett
+with modifications & extensive comments by Joseph Sackett
 
 Capture Environment Variables passed from .bat file through java.exe.
 
-Assuming the first argument is a valid file name, read five lines
+Assuming the firstarg environment variable is a valid file name, read five lines
 of data from the file, and display the data on the console.
 Also create the XML echo file and write some dummy data there.
 
@@ -14,10 +15,9 @@ in this assignment.
 
 Here is the DOS .bat file to run this Java program:
 rem This is shim.bat
-rem Have to set classpath in batch, passing as arg does not work:
-set classpath=%classpath%;c:/[your execution directory]
-rem Pass the name of the first argument to java:
-java -Dfirstarg="%1" Handler
+set clspath=c:\[your execution directory]
+rem pass the classpath & environment variable of the first argument to java:
+java -cp %clspath% -Dfirstarg=%1 Handler
 
 To run:
 
@@ -100,10 +100,4 @@ public class Handler {
   		}
   	}
   	
-//  	/** Buffer for holding symbolic form of data. */ 
-//    private static class myDataArray {
-//  	  	int num_lines = 0;
-//  	  	String[] lines = new String[8];
-//  	}
-
 }

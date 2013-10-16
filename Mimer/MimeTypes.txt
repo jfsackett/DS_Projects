@@ -1,6 +1,6 @@
 # Supported mime types. Format MUST be:
 # extension[space]mimetype
-xy1 application/xy1
+xyz application/xyz
 txt text/plain
 log text/plain
 htm text/html

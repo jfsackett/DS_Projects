@@ -1,0 +1,62 @@
+Joe Sackett's Web Server.
+Web Server Port: 2540
+Back Channel Port: 2570
+Starting Web Server listener on port: 2540
+Starting Back Channel Server listener on port: 2570
+Spawning Web Server worker to process request.
+GET / HTTP/1.1
+Returning directory listing: /
+Spawning Web Server worker to process request.
+GET /favicon.ico HTTP/1.1
+Spawning Web Server worker to process request.
+Returning file: favicon.ico
+GET /favicon.ico HTTP/1.1
+Returning file: favicon.ico
+Spawning Web Server worker to process request.
+GET /mimer_data.xyz HTTP/1.1
+Returning file: mimer_data.xyz
+Spawning Back Channel Server worker to process request.
+Serialized XML data: 
+<myDataArray>
+  <num__lines>5</num__lines>
+  <lines>
+    <string>One partridge in a pear tree</string>
+    <string>Two turtle doves</string>
+    <string>Three French hens</string>
+    <string>Four calling birds</string>
+    <string>Five golden rings</string>
+    <null/>
+    <null/>
+    <null/>
+  </lines>
+</myDataArray>
+
+Deserialized data: 
+One partridge in a pear tree
+Two turtle doves
+Three French hens
+Four calling birds
+Five golden rings
+
+Spawning Web Server worker to process request.
+GET /mimer_rum.xyz HTTP/1.1
+Returning file: mimer_rum.xyz
+Spawning Back Channel Server worker to process request.
+Serialized XML data: 
+<myDataArray>
+  <num__lines>2</num__lines>
+  <lines>
+    <string>Yo Ho Ho...</string>
+    <string>and a bottle of rum.</string>
+    <null/>
+    <null/>
+    <null/>
+    <null/>
+    <null/>
+    <null/>
+  </lines>
+</myDataArray>
+
+Deserialized data: 
+Yo Ho Ho...
+and a bottle of rum.

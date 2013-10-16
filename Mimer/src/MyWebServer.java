@@ -1,34 +1,54 @@
 /*--------------------------------------------------------
+MyWebServer.java
+version 1.2 (supports back channel)
 
 Joseph Sackett
-October 7, 2013
+October 15, 2013
 
 Developed and tested with JDK 1.7.0_40.
 
-Build Instructions:
-Unzip all source files to same directory.
-From a command prompt in that directory, execute:
-javac *.java
+To configure:
+- From Windows Explorer, browse to a .xyz file and open it (double click).
+- Explorer will prompt you for the type of application to associate with this file extension.
+- From the file chooser, browse to shim.bat and check permanently select this application.
 
-Execution Instructions:
+Build Instructions:
+- Make sure that you download Xstream libraries (jar files).
+  See: http://xstream.codehaus.org
+- From a command prompt, change to directory with source files, execute:
+javac -cp "[xstream lib path]\xstream-1.4.5.jar;[xstream lib path]\xpp3_min-1.1.4c.jar;[xstream lib path]\xmlpull-1.1.3.1.jar" MyWebServer.java
+
+Standard Execution Instructions:
 MyWebServer emulates a real web server, except it runs on port 2540 and supports the Firefox web browser.
 1) From a command prompt in the same directory as the build, execute:
-java MyWebServer
+set clspath=[xstream lib path]\xstream-1.4.5.jar;[xstream lib path]\xpp3_min-1.1.4c.jar;[xstream lib path]\xmlpull-1.1.3.1.jar
+java -cp %clspath% MyWebServer
 2) Open Firefox and type this into the browser line:
 http://localhost:2540/
 3) Expect it to return a listing of the directory where the web server program was executed.
 4) Browse through directories or click on a file to have it display in browser, specific to its mime type.
 5) Try many different types of files and directories to test it fully.
 
+Back Channel Execution Instructions:
+1) Star the web server and browser as above.
+2) Get a file ending with .xyz
+3) If prompted, choose Open... and it should default to shim.bat if properly configured (above).
+4) You will see a command prompt appear.
+5) Check that it is working on the client by viewing c:\temp\mimer.output 
+6) Check that it is working on the server by viewing the STDOUT.
+7) The general contents of the outputs should be similar.
+
 A browser from a different machine can perform all of the same actions as long as the firewall rules permit port 2540.
 To test this, substitute the IP address or hostname of the server running MyWebServer for the localhost in the above instructions.
 
 Included Files:
- a. checklist-mywebserver.html
- b. MyWebServer.java
- c. http-streams.txt
- d. serverlog.txt
- e. MimeTypes.txt
+- mimer-discussion.html 
+- Handler.java 
+- BCClient.java 
+- MyWebServer.java 
+- BCHandler.java
+- serverlog.txt 
+- checklist-mimer.html
 
 Notes:
 - Dynamic mime-type mapping using input file (MimeTypes.txt) 
@@ -594,6 +614,7 @@ public class MyWebServer {
 				
 				// Check if end token is missing
 				if (input.size() == 0 || !END_OF_XML.equalsIgnoreCase(input.get(input.size()-1))) {
+					System.out.println("Wrong or Missing Input Terminator");
 					writer.println("Wrong or Missing Input Terminator");
 					writer.flush();
 					return;
@@ -607,6 +628,7 @@ public class MyWebServer {
 				String xml = xmlBuilder.toString();
 				
 				// Print XML.
+				System.out.println("Serialized XML data: ");
 				System.out.println(xml);
 
 		  		// XStream library object for flattening to XML & deserializing back to symbolic form.

@@ -1,32 +1,25 @@
-/* file is: BCClient.java   5-5-07  1.0
-Clark Elliott back server channel client.
+/*--------------------------------------------------------
+BCClient.java 1.1
+Back Channel Client
+Written by Clark Elliott
 with minor modifications & extensive comments by Joseph Sackett
 
-For use with webserver back channel. Written for Windows.
+Tests the web server back channel.
+This is a standalone program to connect with MyWebServer through a
+back channel maintaining a server socket at port 2570.
+Requires the Xstream libraries contained in .jar files to compile, AND to run.
 
 To compile: 
-
-rem jcxclient.bat
-rem java compile BCClient.java with xml libraries...
-rem Here are two possible ways to compile. Uncomment one of them:
-rem set classpath=%classpath%C:\dp\435\java\mime-xml\;c:\Program Files\Java\jdk1.5.0_05\lib\xstream-1.2.1.jar;c:\Program Files\Java\jdk1.5.0_05\lib\xpp3_min-1.1.3.4.O.jar;
-rem javac -cp "c:\Program Files\Java\jdk1.5.0_05\lib\xstream-1.2.1.jar;c:\Program Files\Java\jdk1.5.0_05\lib\xpp3_min-1.1.3.4.O.jar" BCClient.java
-
-Note that both classpath mechanisms are included. One should work for you.
-
-Requires the Xstream libraries contained in .jar files to compile, AND to run.
-See: http://xstream.codehaus.org/tutorial.html
-
+- make sure that you download Xstream libraries (jar files).
+  See: http://xstream.codehaus.org
+- change to directory with source files, execute:
+javac -cp "[xstream lib path]\xstream-1.4.5.jar;[xstream lib path]\xpp3_min-1.1.4c.jar;[xstream lib path]\xmlpull-1.1.3.1.jar" BCClient.java
 
 To run:
-
-rem rxclient.bat
-rem java run BCClient.java with xml libraries:
-set classpath=%classpath%C:\dp\435\java\mime-xml\;c:\Program Files\Java\jdk1.5.0_05\lib\xstream-1.2.1.jar;c:\Program Files\Java\jdk1.5.0_05\lib\xpp3_min-1.1.3.4.O.jar;
-java BCClient
-
-This is a standalone program to connect with MyWebServer.java through a
-back channel maintaining a server socket at port 2570.
+- open command prompt and change to directory containing BCClient.class
+- execute these commands:
+set clspath=[xstream lib path]\xstream-1.4.5.jar;[xstream lib path]\xpp3_min-1.1.4c.jar;[xstream lib path]\xmlpull-1.1.3.1.jar
+java -cp %clspath% BCClient
 
 ----------------------------------------------------------------------*/
 
@@ -180,10 +173,3 @@ public class BCClient{
   	}
     
 }
-
-
-//	/** Buffer for holding symbolic form of data. */ 
-//	private static class myDataArray {
-//	  	int num_lines = 0;
-//	  	String[] lines = new String[8];
-//	}
