@@ -95,7 +95,7 @@ public class BCHandler{
   			// Read mime date from temporary file into myDataArray object.
   			myDataArray input = new myDataArray();
   			int i = 0;
-  			// Only allows for five lines of data in input file plus safety:
+  			// Reads the lines from the file (seven at most).
   			while(((input.lines[i++] = fromMimeDataFile.readLine())!= null) && i < 8){
   				System.out.println("Data is: " + input.lines[i-1]);
   			}

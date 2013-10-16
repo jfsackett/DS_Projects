@@ -1,0 +1,19 @@
+<html>
+<head> 
+<title> Mimer Discussion </title>
+</head>
+<body>
+<h1>Mimer Discussion</h1>
+<h2>Joseph Sackett </h2>
+<h2>CSC435 - Distributed Systems 1 </h2>
+<h2>Oct. 15, 2013</h2>
+
+<p>This was a tricky but educational project. While I am certainly familiar with the concept of mime types and know that they affect the way a client browser handles the response from a web server, I had never created my own custom one. Further, writing the handler and back channel communication was a new experience. This will discuss some of what I did and much of what I learned.</p>
+<p>The assignment documentation had extensive information about all of the steps and my first step was to extend MyWebServer to serve .xyz files with the proper Content-Type: header (application/xyz). This was trivial as my web server already used a configuration file to load the mime types. Next was to register the new file extension (.xyz) with the shim.bat file. This was trickier than I expected and I encountered some dead ends before succeeding in Windows and seeing it launch the stubbed batch file in Firefox. As expected, Firefox passed in the name of the temporary file as the first parameter. Step 1 complete and I now know how to register and serve a custom mime type.</p>
+<p>The next step was to enhance Dr. Elliott’s example code to get the stub Handler.java called from shim.bat. Java code pulled the file name from an environment variable passed from shim.bat, then opened that file and read the contents into an internal object. This is essentially the next link in the chain of handing the custom mime response from the server. This data was just echoed to the console. Next step and I saw how the handshake would go from the shim to a Java handler.</p>
+<p>Step 3 was to compile and run Dr. Elliott’s BCClient.java example code to show how XStream can use Java reflection to flatten out an object into XML. This XML was then written to an output file. No eureka here but I can see where we are going with it.</p>
+<p>Step 4 involved the most coding as I retrofitted MyWebServer with backchannel capabilities. This was a natural extension but did involve incorporating XStream to deserialize the inbound XML. Both the XML and reconstituted object were echoed to the console. In order to test this, BCClient was enhanced to make client requests to the backchannel port. Another link in the chain, building on things I already knew and had done.</p>
+<p>Step 5 put it all together and basically involved knitting Handler.java & BCClient.java example code together (into BCHandler.java) to complete the round trip. Browser GET (.xyz) -> Firefox registered mime type handler (shim.bat) -> BCHandler (flatten file contents to XML & send) -> MyWebServer backchannel (receive XML & deserialize). This took some fun debugging to get all working and stable and was rewarding to see all the parts in motion.</p>
+<p>This was an all-around good project and my first opportunity to create a custom mime type and handler application. I now have a better understanding of the mechanism and a new tool in my toolbox.</p>
+</body>
+</html>
