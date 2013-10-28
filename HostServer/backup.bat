@@ -1,0 +1,5 @@
+copy C:\Users\Joe\git\DS_Projects\HostServer\src\*.java "C:\Users\Joe\Google Drive\School\Courses\DistributedSystems-435\HostServer"
+copy C:\Users\Joe\git\DS_Projects\HostServer\*.txt "C:\Users\Joe\Google Drive\School\Courses\DistributedSystems-435\HostServer"
+copy C:\Users\Joe\git\DS_Projects\HostServer\*.html "C:\Users\Joe\Google Drive\School\Courses\DistributedSystems-435\HostServer"
+copy C:\Users\Joe\git\DS_Projects\HostServer\*.bat "C:\Users\Joe\Google Drive\School\Courses\DistributedSystems-435\HostServer"
+copy C:\Users\Joe\git\DS_Projects\HostServer\*.ico "C:\Users\Joe\Google Drive\School\Courses\DistributedSystems-435\HostServer"
