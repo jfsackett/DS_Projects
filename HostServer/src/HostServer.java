@@ -35,12 +35,9 @@ Notes:
 
 ----------------------------------------------------------*/
 import java.io.BufferedReader;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.net.ServerSocket;
@@ -117,9 +114,6 @@ public class HostServer {
 	/** Buffer Size. */
 	private static final int BUFFER_SIZE = 1000;
 	
-	/** Web Server Strategy Singleton. */
-//	private static final ServerStrategy WEB_SERVER_STRATEGY = new WebServerStrategy();
-	
 	/** Back Channel Server Strategy Singleton. */
 	private static final ServerStrategy HOST_SERVER_STRATEGY = new HostServerStrategy();
 	
@@ -180,22 +174,26 @@ public class HostServer {
 	 */
 	private static class Server implements Runnable {
 		/** Port bound to by this server. */
-		int portNum;
+		private int portNum;
 		
 		/** Strategy executed by workers processing connections to this server (web server or back channel). */
-		ServerStrategy serverStrategy;
+		private ServerStrategy serverStrategy;
 		
 		/** Server listener socket. */
 		private ServerSocket serverSocket = null;
 		
 		/** Control switch to shutdown this server instance. */
-		boolean controlSwitch = true;
+		private boolean controlSwitch = true;
 		
 		public Server(int portNum, ServerStrategy serverStrategy) {
 			this.portNum = portNum;
 			this.serverStrategy = serverStrategy;
 		}
 		
+		public int getPortNum() {
+			return portNum;
+		}
+
 		public boolean isControlSwitch() {
 			return controlSwitch;
 		}
@@ -204,10 +202,14 @@ public class HostServer {
 			this.controlSwitch = controlSwitch;
 		}
 
+		public void setServerStrategy(ServerStrategy serverStrategy) {
+			this.serverStrategy = serverStrategy;
+		}
+
 		/** Thread run method. Terminates upon completion. */
 		@Override
 		public void run() {
-			System.out.println("Starting " + serverStrategy.getTypeName() + " listener on port: " + portNum);			
+			System.out.println("Starting " + serverStrategy.getTypeName() + " listener on port: " + getPortNum());			
 			try {
 				serverSocket = new ServerSocket(portNum);
 				while (isControlSwitch()) {
@@ -228,7 +230,7 @@ public class HostServer {
 					try { serverSocket.close(); } catch (IOException ex) {}
 				}
 			}
-			System.out.println(serverStrategy.getTypeName() + " listener exiting.");
+			System.out.println(serverStrategy.getTypeName() + " at: " + getPortNum() + " listener exiting.");
 		}
 	}
 
@@ -257,7 +259,7 @@ public class HostServer {
 		 */
 		@Override
 		public void run() {
-			System.out.println("Spawning " + serverStrategy.getTypeName() + " worker to process request.");
+			System.out.println("Spawning " + serverStrategy.getTypeName() + " worker at: " + server.getPortNum() + " to process request.");
 			serverStrategy.processRequest(socket, server);
 		}
 	}
@@ -275,25 +277,22 @@ public class HostServer {
 	}
 	
 	/**
-	 * Implementation for processing Web Server client requests.
+	 * Abstract superclass of Server Strategies.
 	 * Part of Strategy pattern.
 	 */
-	private static class WebServerStrategy implements ServerStrategy {
-		/** Echo type name specific for this strategy. */
-		@Override
-		public String getTypeName() {
-			return "Web Server";
-		}
+	private abstract static class AbstractServerStrategy implements ServerStrategy {
+		/** Required subclass method to handle requests. */
+		protected abstract void handleRequest(List<String> fullRequest, PrintStream writer, Server server) throws IOException;
 		
 		/** Processes a client request specific for the web server strategy. */
 		@Override
 		public void processRequest(Socket socket, Server server) {
 			BufferedReader reader =  null;
-			DataOutputStream writer = null;
+			PrintStream writer = null;
 			try {
 				// Get I/O streams from the socket.
 				reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-				writer = new DataOutputStream(socket.getOutputStream());
+				writer = new PrintStream(socket.getOutputStream());
 
 				// Read all input from web browser via socket.
 				List<String> input = new ArrayList<String>();
@@ -306,7 +305,7 @@ public class HostServer {
 				// Process request.
 				if (input.size() > 0) {
 					System.out.println(input.get(0));
-					respondToRequest(input.get(0), writer);
+					handleRequest(input, writer, server);
 				}
 				else {
 		    		writeError(BAD_REQUEST, "No Request Received.", writer);
@@ -320,9 +319,6 @@ public class HostServer {
 				if (reader != null) {
 					try {reader.close();} catch (IOException ex) {}
 				}
-				if (writer != null) {
-					try{writer.close();} catch (IOException ex) {}
-				}
 				if (socket != null) {
 					try {socket.close();} catch (IOException ex) {}
 				}
@@ -330,51 +326,9 @@ public class HostServer {
 		}
 		
 		/**
-		 * Process request string & delegate to handler functions.
-		 */
-		private static void respondToRequest(String request, DataOutputStream writer) throws IOException {
-			// Validate request
-	    	StringTokenizer toker = new StringTokenizer(request, " ");
-	    	List<String> tokens = new ArrayList<String>(); 
-	    	while (toker.hasMoreTokens()) {
-	    		tokens.add(toker.nextToken());
-	    	}
-	    	if (tokens.size() < 3 || !tokens.get(0).equalsIgnoreCase(GET)) {
-	    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
-	    		return;
-	    	}
-	    	
-	    	// Tie URL to local directory & check for shenanigans.
-	    	String url = "." + tokens.get(1);
-	    	if (url.contains("..")) {
-	    		writeError(FORBIDDEN, "You don't have permission to access " + tokens.get(1) + " on this server.", writer);
-	    		return;
-	    	}
-	    	
-	    	// Does requested file exist?
-			File file = new File(url);
-			if (!file.exists()) {
-	    		writeError(NOT_FOUND, "The requested URL " + tokens.get(1) + " was not found on this server.", writer);
-	    		return;
-			}
-			
-			// Dispatch based on file, directory or CGI request.
-			if (file.isFile()) {
-	    		processFileRequest(file, writer);
-			}
-			else if (file.isDirectory()) {
-	    		processDirRequest(file, writer);
-			}
-			else {
-	    		writeError(NOT_FOUND, "The requested URL " + tokens.get(1) + " was not found on this server.", writer);
-	    		return;
-			}
-		}
-		
-		/**
 		 * Writes error code & html back to browser.
 		 */
-		private static void writeError(int code, String error, DataOutputStream writer) throws IOException {
+		protected static void writeError(int code, String error, PrintStream writer) throws IOException {
 			System.out.println("Returning " + code + " error: " + error);
 			// Build error response HTML.
 			StringBuilder responseBuilder = new StringBuilder();
@@ -387,176 +341,86 @@ public class HostServer {
 			responseBuilder.append("</body></html>").append(CRLF);
 			String response = responseBuilder.toString();
 			
-			writer.writeBytes("HTTP/1.1 " + code + ' ' + responses.get(code) + CRLF);
-			writer.writeBytes("Content-Length: " + response.length() + CRLF);
-			writer.writeBytes("Content-Type: " + mimeTypes.get("html") + CRLF);
-			writer.writeBytes("Connection: close" + CRLF + CRLF);
-			writer.writeBytes(response);
-			writer.writeBytes(CRLF);
+			writer.print("HTTP/1.1 " + code + ' ' + responses.get(code) + CRLF);
+			writer.print("Content-Length: " + response.length() + CRLF);
+			writer.print("Content-Type: " + mimeTypes.get("html") + CRLF);
+			writer.print("Connection: close" + CRLF + CRLF);
+			writer.print(response);
+			writer.print(CRLF);
 			writer.flush();
-		}
+		}		
 		
 		/**
 		 * Writes OK and other output headers for successful response.
 		 */
-		private static void writeOkHeader(long length, String mimeType, DataOutputStream writer) throws IOException {
-			writer.writeBytes("HTTP/1.1 200 OK" + CRLF);
-			writer.writeBytes("Content-Length: " + length + CRLF);
-			writer.writeBytes("Content-Type: " + mimeType + CRLF);
-			writer.writeBytes("Connection: close" + CRLF + CRLF);
-		}
-		
-		/**
-		 * Return the contents of a file to the browser.
-		 */
-		private static void processFileRequest(File file, DataOutputStream writer) throws IOException {
-			// Parse file name for extension.
-			String fileName = file.getName();
-			String fileExtension = fileName.substring(fileName.lastIndexOf('.')+1).toLowerCase();
-			String mimeType = mimeTypes.get(fileExtension);
-			// If no mime type for this extension, reload mime type file in case it was added.
-			if (mimeType == null) {
-				loadMimeTypesFile();
-				mimeType = mimeTypes.get(fileExtension);
-				// If still missing mime type, return error.
-				if (mimeType == null) {
-		    		writeError(BAD_REQUEST, "No Mime Type for this request: " + fileName, writer);
-		    		return;
-				}
-			}
-			
-			System.out.println("Returning file: " + file.getName());
-			writeOkHeader(file.length(), mimeTypes.get(fileExtension), writer);
-			InputStream fileReader = null;
-			try {
-				// Open input file & read into 
-				fileReader = new DataInputStream(new FileInputStream(file));
-				// Read and immediately output bytes until done.
-				byte[] buffer = new byte[BUFFER_SIZE];
-				while (fileReader.read(buffer) > 0) {
-					writer.write(buffer);
-				}
-			} catch (IOException ex) {
-				System.out.println(ex);
-			}
-			finally {
-				if (fileReader != null) {
-					try {fileReader.close();} catch (Exception ex) {}
-				}
-				writer.flush();
-			}
-		}
-		
-		/**
-		 * Returns a directory listing to the browser.
-		 */
-		private static void processDirRequest(File dir, DataOutputStream writer) throws IOException {
-			String currDir = dir.getPath().substring(1).replace(PATH_SEP, SLASH);
-			currDir = (currDir.length() == 0) ? "/" : currDir;
-			String parentDir = (dir.getParent() == null) ? "" : dir.getParent().substring(1).replace(PATH_SEP, SLASH);
-			parentDir = (parentDir.length() == 0 && currDir.length() > 1) ? "/" : parentDir;
-			StringBuilder responseBuilder = new StringBuilder();
-			responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
-			responseBuilder.append("<html><head>").append(CRLF);
-			responseBuilder.append("<title>").append("Index of ").append(currDir).append("</title>").append(CRLF);
-			responseBuilder.append("</head><body>").append(CRLF);
-			responseBuilder.append("<h1>").append("Index of ").append(currDir).append("</h1>").append(CRLF);
-			responseBuilder.append("<pre>").append(CRLF);
-			if (parentDir.length() > 0) {
-				responseBuilder.append("[D]  ");
-				responseBuilder.append("<a href=\"").append(parentDir).append("\">");
-				responseBuilder.append("Parent Directory</a>").append(CRLF);
-			}
-			File[] files = dir.listFiles(); 
-			for (int i = 0; i < files.length; i++) {
-				if (files[i].isFile()) {
-					// Check for index.html to mask directory listing.
-					if (files[i].getName().equals(INDEX_HTML)) {
-						// Short-circuit directory listing & display index.html.
-						processFileRequest(files[i], writer);
-						return;
-					}
-					responseBuilder.append("[F]  ");
-					responseBuilder.append("<a href=\"").append((dir.getParent() == null) ? "" : dir.getParent().substring(dir.getParent().lastIndexOf(".")+1)).append(dir.getName()).append('/').append(files[i].getName()).append("\">");
-					responseBuilder.append(files[i].getName()).append("</a>").append(CRLF);
-				}
-				else if (files[i].isDirectory()) {
-					responseBuilder.append("[D]  ");
-					responseBuilder.append("<a href=\"").append((dir.getParent() == null) ? "" : dir.getParent().substring(dir.getParent().lastIndexOf(".")+1)).append(dir.getName()).append('/').append(files[i].getName()).append("\">");
-					responseBuilder.append(files[i].getName()).append("</a>").append(CRLF);
-				}
-			}
-			responseBuilder.append("</pre>").append(CRLF);
-			responseBuilder.append("</body></html>").append(CRLF);			
-			
-			System.out.println("Returning directory listing: " + currDir);
-			String response = responseBuilder.toString();
-			writeOkHeader(response.length(), mimeTypes.get("html"), writer);
-			writer.writeBytes(response);
-			writer.writeBytes(CRLF);
-			writer.flush();
-		}
+		protected static void writeOkHeader(long length, String mimeType, PrintStream writer) throws IOException {
+			writer.print("HTTP/1.1 200 OK" + CRLF);
+			writer.print("Content-Length: " + length + CRLF);
+			writer.print("Content-Type: " + mimeType + CRLF);
+			writer.print("Connection: close" + CRLF + CRLF);
+		}		
 	}
 	
 	/**
 	 * Implementation for processing Host Server client requests.
 	 * Part of Strategy pattern.
 	 */
-	private static class HostServerStrategy implements ServerStrategy {
+	private static class HostServerStrategy extends AbstractServerStrategy {
 		/** Echo type name specific for this strategy. */
 		@Override
 		public String getTypeName() {
 			return "Host Server";
 		}
 		
-		/** Processes a client request specific for the host server strategy. */
-		@Override
-		public void processRequest(Socket socket, Server server) {
-			BufferedReader reader =  null;
-			PrintStream writer = null;
-			try {
-				// Get I/O streams from the socket.
-				reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-				writer = new PrintStream(socket.getOutputStream());
-	
-				// Read all input from client via socket.
-				List<String> input = new ArrayList<String>();
-				do {
-					// Read line by line & save in list.
-					String line = reader.readLine();
-					input.add(line);
-				} while (reader.ready()) ;
-				
-				// Process request.
-				if (input.size() > 0) {
-					System.out.println(input.get(0));
-					respondToRequest(input, writer);
-				}
-				else {
-		    		writeError(BAD_REQUEST, "No Request Received.", writer);
-				}				
-	
-			} catch (IOException ex) {
-				System.out.println(ex);
-				ex.printStackTrace();
-			}
-			finally {
-				if (reader != null) {
-					try {reader.close();} catch (IOException ex) {}
-				}
-				if (writer != null) {
-					writer.close();
-				}
-				if (socket != null) {
-					try {socket.close();} catch (IOException ex) {}
-				}
-			}			
-		}
+//		/** Processes a client request specific for the host server strategy. */
+//		@Override
+//		public void processRequest(Socket socket, Server server) {
+//			BufferedReader reader =  null;
+//			PrintStream writer = null;
+//			try {
+//				// Get I/O streams from the socket.
+//				reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+//				writer = new PrintStream(socket.getOutputStream());
+//	
+//				// Read all input from client via socket.
+//				List<String> input = new ArrayList<String>();
+//				do {
+//					// Read line by line & save in list.
+//					String line = reader.readLine();
+//					input.add(line);
+//				} while (reader.ready()) ;
+//				
+//				// Process request.
+//				if (input.size() > 0) {
+//					System.out.println(input.get(0));
+//					respondToRequest(input, writer);
+//				}
+//				else {
+//		    		writeError(BAD_REQUEST, "No Request Received.", writer);
+//				}				
+//	
+//			} catch (IOException ex) {
+//				System.out.println(ex);
+//				ex.printStackTrace();
+//			}
+//			finally {
+//				if (reader != null) {
+//					try {reader.close();} catch (IOException ex) {}
+//				}
+//				if (writer != null) {
+//					writer.close();
+//				}
+//				if (socket != null) {
+//					try {socket.close();} catch (IOException ex) {}
+//				}
+//			}			
+//		}
 
 		/**
 		 * Process request string & delegate to handler functions.
 		 */
-		private static void respondToRequest(List<String> fullRequest, PrintStream writer) throws IOException {
+		@Override
+		protected void handleRequest(List<String> fullRequest, PrintStream writer, Server server) throws IOException {
 			try {
 				// Parse & validate request
 				String request = fullRequest.get(0);
@@ -637,48 +501,14 @@ public class HostServer {
 			
 			System.out.println("Host Server exiting.");
 	    }
-		
-		/**
-		 * Writes OK and other output headers for successful response.
-		 */
-		private static void writeOkHeader(long length, String mimeType, PrintStream writer) throws IOException {
-			writer.print("HTTP/1.1 200 OK" + CRLF);
-			writer.print("Content-Length: " + length + CRLF);
-			writer.print("Content-Type: " + mimeType + CRLF);
-			writer.print("Connection: close" + CRLF + CRLF);
-		}
-		
-		/**
-		 * Writes error code & html back to browser.
-		 */
-		private static void writeError(int code, String error, PrintStream writer) throws IOException {
-			System.out.println("Returning " + code + " error: " + error);
-			// Build error response HTML.
-			StringBuilder responseBuilder = new StringBuilder();
-			responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
-			responseBuilder.append("<html><head>").append(CRLF);
-			responseBuilder.append("<title>").append(code).append(' ').append(responses.get(code)).append("</title>").append(CRLF);
-			responseBuilder.append("</head><body>").append(CRLF);
-			responseBuilder.append("<h1>").append(responses.get(code)).append("</h1>").append(CRLF);
-			responseBuilder.append("<p>").append(error).append("</p>").append(CRLF);
-			responseBuilder.append("</body></html>").append(CRLF);
-			String response = responseBuilder.toString();
-			
-			writer.print("HTTP/1.1 " + code + ' ' + responses.get(code) + CRLF);
-			writer.print("Content-Length: " + response.length() + CRLF);
-			writer.print("Content-Type: " + mimeTypes.get("html") + CRLF);
-			writer.print("Connection: close" + CRLF + CRLF);
-			writer.print(response);
-			writer.print(CRLF);
-			writer.flush();
-		}		
+
 	}
 		
 	/**
 	 * Implementation for processing Agent Server client requests.
 	 * Part of Strategy pattern.
 	 */
-	private static class AgentServerStrategy implements ServerStrategy {
+	private static class AgentServerStrategy extends AbstractServerStrategy {
 		/** Agent state. */
 		private AgentState agentState;		
 		
@@ -692,55 +522,56 @@ public class HostServer {
 			return "Agent Server";
 		}
 		
-		/** Processes a client request specific for the agent server strategy. */
-		@Override
-		public void processRequest(Socket socket, Server server) {
-			BufferedReader reader =  null;
-			PrintStream writer = null;
-			try {
-				// Get I/O streams from the socket.
-				reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-				writer = new PrintStream(socket.getOutputStream());
-
-				// Read all input from back channel browser via socket.
-				List<String> input = new ArrayList<String>();
-				do {
-					// Read line by line & save in list.
-					String line = reader.readLine();
-					input.add(line);
-				} while (reader.ready()) ;
-				
-				// Process request.
-				if (input.size() > 0) {
-					System.out.println(input.get(0));
-					respondToRequest(input, writer, server);
-				}
-				else {
-		    		writeError(BAD_REQUEST, "No Request Received.", writer);
-				}				
-
-				writer.flush();				
-			} catch (IOException ex) {
-				System.out.println(ex);
-				ex.printStackTrace();
-			}
-			finally {
-				if (reader != null) {
-					try {reader.close();} catch (IOException ex) {}
-				}
-				if (writer != null) {
-					writer.close();
-				}
-				if (socket != null) {
-					try {socket.close();} catch (IOException ex) {}
-				}
-			}			
-		}
+//		/** Processes a client request specific for the agent server strategy. */
+//		@Override
+//		public void processRequest(Socket socket, Server server) {
+//			BufferedReader reader =  null;
+//			PrintStream writer = null;
+//			try {
+//				// Get I/O streams from the socket.
+//				reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+//				writer = new PrintStream(socket.getOutputStream());
+//
+//				// Read all input from back channel browser via socket.
+//				List<String> input = new ArrayList<String>();
+//				do {
+//					// Read line by line & save in list.
+//					String line = reader.readLine();
+//					input.add(line);
+//				} while (reader.ready()) ;
+//				
+//				// Process request.
+//				if (input.size() > 0) {
+//					System.out.println(input.get(0));
+//					respondToRequest(input, writer, server);
+//				}
+//				else {
+//		    		writeError(BAD_REQUEST, "No Request Received.", writer);
+//				}				
+//
+//				writer.flush();				
+//			} catch (IOException ex) {
+//				System.out.println(ex);
+//				ex.printStackTrace();
+//			}
+//			finally {
+//				if (reader != null) {
+//					try {reader.close();} catch (IOException ex) {}
+//				}
+//				if (writer != null) {
+//					writer.close();
+//				}
+//				if (socket != null) {
+//					try {socket.close();} catch (IOException ex) {}
+//				}
+//			}			
+//		}
 		
 		/**
 		 * Process request string & delegate to handler functions.
 		 */
-		private void respondToRequest(List<String> fullRequest, PrintStream writer, Server server) throws IOException {
+		@Override
+		protected void handleRequest(List<String> fullRequest, PrintStream writer, Server server) throws IOException {
 			// Parse & validate request.
 			String request = fullRequest.get(0);
 	    	StringTokenizer toker = new StringTokenizer(request, " ");
@@ -770,19 +601,24 @@ public class HostServer {
 	    	
     		// Check for migration request.
     		if (MIGRATE.equalsIgnoreCase(input)) {
+    			// Request migration location from nameserver.
     			String migrateRequest = MIGRATE + ' ' + AGENT + '?' + INPUT + '=' + agentState.getInput() + '&' + COUNT + '=' + agentState.getCount() + CRLF;
     			migrateRequest += HOST_HEADER + host + ':' + port + CRLF + CRLF;
 				String response = genericRequest(host, HS_PORT, migrateRequest);
     			host = response.substring(0, response.lastIndexOf(':'));
     			String newPort = response.substring(response.lastIndexOf(':')+1);
+    			
+    			// Change this server to a zombie server.
+				server.setServerStrategy(new ZombieServerStrategy(host + ':' + newPort));
+
 				// Build HTML redirection for browser client.
 				StringBuilder responseBuilder = new StringBuilder();
 				responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
 				responseBuilder.append("<html><head>").append(CRLF);
 				responseBuilder.append("<meta charset=\"UTF-8\">").append(CRLF);
-				responseBuilder.append("<meta http-equiv=\"refresh\" content=\"1;url=http://").append(host).append(':').append(newPort).append("\">").append(CRLF);
+				responseBuilder.append("<meta http-equiv=\"refresh\" content=\"1;url=http://").append(host).append(':').append(port).append("\">").append(CRLF);
 				responseBuilder.append("<script type=\"text/javascript\">").append(CRLF);
-				responseBuilder.append("window.location.href = \"").append("http://").append(host).append(':').append(newPort).append('"').append(CRLF);
+				responseBuilder.append("window.location.href = \"").append("http://").append(host).append(':').append(port).append('"').append(CRLF);
 				responseBuilder.append("</script>").append(CRLF);
 				responseBuilder.append("<title>Page Redirection</title>").append(CRLF);
 				responseBuilder.append("</head><body></body></html>").append(CRLF);				
@@ -790,8 +626,7 @@ public class HostServer {
 				writeOkHeader(response.length(), mimeTypes.get("html"), writer);
 				writer.print(response);
 				writer.print(CRLF);
-				server.setControlSwitch(false);
-				genericRequest(host, Integer.parseInt(port), "NULL" + CRLF + CRLF);
+				writer.flush();
 	    	}
     		else {
     			if (input != null) {
@@ -817,43 +652,112 @@ public class HostServer {
 				writeOkHeader(response.length(), mimeTypes.get("html"), writer);
 				writer.print(response);
 				writer.print(CRLF);
+				writer.flush();
     		}
-	    }
+	    }		
+	}
+	
+	/**
+	 * Implementation for processing Zombie Server client requests.
+	 * Part of Strategy pattern.
+	 */
+	private static class ZombieServerStrategy extends AbstractServerStrategy {
+		/** Forwarding address where this agent migrated (server:port). */
+		private String forwardingAddress;		
 		
-		/**
-		 * Writes OK and other output headers for successful response.
-		 */
-		private static void writeOkHeader(long length, String mimeType, PrintStream writer) throws IOException {
-			writer.print("HTTP/1.1 200 OK" + CRLF);
-			writer.print("Content-Length: " + length + CRLF);
-			writer.print("Content-Type: " + mimeType + CRLF);
-			writer.print("Connection: close" + CRLF + CRLF);
+		public ZombieServerStrategy(String forwardingAddress) {
+			this.forwardingAddress = forwardingAddress;
+		}
+
+		/** Echo type name specific for this strategy. */
+		@Override
+		public String getTypeName() {
+			return "Zombie Server";
 		}
 		
 		/**
-		 * Writes error code & html back to browser.
+		 * Process request string & delegate to handler functions.
 		 */
-		private static void writeError(int code, String error, PrintStream writer) throws IOException {
-			System.out.println("Returning " + code + " error: " + error);
-			// Build error response HTML.
+		@Override
+		protected void handleRequest(List<String> fullRequest, PrintStream writer, Server server) throws IOException {
+			// Parse & validate request.
+			String request = fullRequest.get(0);
+	    	StringTokenizer toker = new StringTokenizer(request, " ");
+	    	List<String> tokens = new ArrayList<String>(); 
+	    	while (toker.hasMoreTokens()) {
+	    		tokens.add(toker.nextToken());
+	    	}
+	    	if (tokens.size() < 3 || !tokens.get(0).equalsIgnoreCase(GET) || tokens.get(1).contains(FAV_ICON)) {
+	    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
+	    		return;
+	    	}
+	    	
+	    	// Parse host name & port from headers.
+	    	String host = null, port = null;
+	    	for (String header : fullRequest) {
+	    		if (header.contains(HOST_HEADER)) {
+	    			host = header.substring(HOST_HEADER.length(), header.lastIndexOf(':'));
+	    			port = header.substring(header.lastIndexOf(':')+1);
+	    			break;
+	    		}
+	    	}
+			System.out.println("Zombie forwarding from: " + host + ':' + port + " to: " + forwardingAddress);
+
+			// Parse input parameters.
+			String params = "";
+			if (request.contains("?")) {
+				params = request.substring(request.indexOf('?'));
+			}
+
+//			Map<String,String> paramMap = parseParams(tokens.get(1));
+//			String input = paramMap.get(INPUT);
+	    	
+    		// HTML redirection to forward request with name/value parameters.
 			StringBuilder responseBuilder = new StringBuilder();
 			responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
 			responseBuilder.append("<html><head>").append(CRLF);
-			responseBuilder.append("<title>").append(code).append(' ').append(responses.get(code)).append("</title>").append(CRLF);
-			responseBuilder.append("</head><body>").append(CRLF);
-			responseBuilder.append("<h1>").append(responses.get(code)).append("</h1>").append(CRLF);
-			responseBuilder.append("<p>").append(error).append("</p>").append(CRLF);
-			responseBuilder.append("</body></html>").append(CRLF);
+			responseBuilder.append("<meta charset=\"UTF-8\">").append(CRLF);
+			responseBuilder.append("<meta http-equiv=\"refresh\" content=\"1;url=http://").append(forwardingAddress).append(params).append("\">").append(CRLF);
+			responseBuilder.append("<script type=\"text/javascript\">").append(CRLF);
+			responseBuilder.append("window.location.href = \"").append("http://").append(forwardingAddress).append(params).append('"').append(CRLF);
+			responseBuilder.append("</script>").append(CRLF);
+			responseBuilder.append("<title>Page Redirection</title>").append(CRLF);
+			responseBuilder.append("</head><body></body></html>").append(CRLF);				
 			String response = responseBuilder.toString();
-			
-			writer.print("HTTP/1.1 " + code + ' ' + responses.get(code) + CRLF);
-			writer.print("Content-Length: " + response.length() + CRLF);
-			writer.print("Content-Type: " + mimeTypes.get("html") + CRLF);
-			writer.print("Connection: close" + CRLF + CRLF);
+			writeOkHeader(response.length(), mimeTypes.get("html"), writer);
 			writer.print(response);
 			writer.print(CRLF);
 			writer.flush();
-		}		
+			
+			server.setControlSwitch(false);
+			genericRequest(host, Integer.parseInt(port), "NULL" + CRLF + CRLF);
+//	    	}
+//    		else {
+//    			if (input != null) {
+//	    	    	// Set agent input state.
+//	       			agentState.setInput(input);
+//	       			// Increment usage count.
+//	        		agentState.incCount();
+//    			}
+//        		
+//				// Build HTML response for browser client.
+//				StringBuilder responseBuilder = new StringBuilder();
+//				responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
+//				responseBuilder.append("<html><head>").append(CRLF);
+//				responseBuilder.append("<title>").append("Agent at: ").append(host).append(':').append(port).append("</title>").append(CRLF);
+//				responseBuilder.append("</head><body>").append(CRLF);
+//				responseBuilder.append("<h1>").append("Agent at&nbsp;&nbsp;&nbsp;").append(host).append(':').append(port).append("</h1>").append(CRLF);
+//				responseBuilder.append("<h2>").append("Agent state: ").append(agentState.getCount()).append("</h2>").append(CRLF);
+//				responseBuilder.append("<form method=\"GET\" action=\"http://").append(host).append(':').append(port).append("\">").append(CRLF);
+//				responseBuilder.append("Enter text or <i>migrate</i>: <input type=\"text\" name=\"").append(INPUT).append("\" size=\"20\" value=\"").append(agentState.getInput()).append("\"/><p/>").append(CRLF);
+//				responseBuilder.append("<input type=\"submit\" value=\"Submit\"<p/>").append(CRLF);
+//				responseBuilder.append("</form></body></html>").append(CRLF);			
+//				String response = responseBuilder.toString();				
+//				writeOkHeader(response.length(), mimeTypes.get("html"), writer);
+//				writer.print(response);
+//				writer.print(CRLF);
+//    		}
+	    }		
 	}
 	
 	/**
@@ -893,15 +797,17 @@ public class HostServer {
 	}
 	
 	/**
-	 * Parses parameters from URL and returns as map.
+	 * Parses request parameters and returns as map.
 	 */
 	private static Map<String,String> parseParams(String request) {
     	Map<String,String> paramMap = new HashMap<String,String>(); 
 		String params;
+		// Check whether there are parameters.
 		if (!request.contains("?") || (params = request.substring(request.indexOf('?')+1)) == null || params.length() == 0) {
     		return paramMap;
 		}
 		
+		// Tokenize the parameters out.
     	StringTokenizer toker = new StringTokenizer(params, "&");
     	while (toker.hasMoreTokens()) {
     		String token, name, value;
@@ -911,7 +817,6 @@ public class HostServer {
 	    		return paramMap;
 			}
     		paramMap.put(name, value);
-    		System.out.println(name + '=' + value);
     	}
     	
     	return paramMap;
