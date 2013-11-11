@@ -431,7 +431,10 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("192.168.3.100"
 		
 		/** Port of Name Server for registering agent servers. */
 		private int nameServerPort;
-		
+
+		/** Map of agent names to agent servers (server:port) on this hostserver. */
+		private Map<String,String> agentServers = new HashMap<String,String>();		
+
 		public HostServerStrategy(String hostServerHost, int hostServerPort, String nameServerHost, int nameServerPort) {
 			this.hostServerHost = hostServerHost;
 			this.hostServerPort = hostServerPort;
@@ -474,14 +477,42 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("192.168.3.100"
 		    	for (String header : fullRequest) {
 		    		if (header.contains(HOST_HEADER)) {
 		    			host = header.substring(HOST_HEADER.length(), header.lastIndexOf(':'));
-		    			break;
+//		    			break;
 		    		}
+		    		System.out.println(header);
 		    	}
 
 //++AG_PORT;
 		    	
 //		    	AgentState agentState = null;
-				if (command.equalsIgnoreCase(GET)) {				// Start new agent request from browser.
+				if (command.equalsIgnoreCase(GET)) {
+					if ("/".equalsIgnoreCase(tokens.get(1))) {
+						// Display host server UI in browser.
+						StringBuilder responseBuilder = new StringBuilder();
+						responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
+						responseBuilder.append("<html><head>").append(CRLF);
+						responseBuilder.append("<title>").append("Host Server Manifest").append("</title>").append(CRLF);
+						responseBuilder.append("</head><body>").append(CRLF);
+						responseBuilder.append("<h1>").append("Host Server Manifest").append("</h1>").append(CRLF);
+						responseBuilder.append("<a href=\"http://").append(hostServerHost).append(':').append(hostServerPort).append("/createNew\">");
+						responseBuilder.append("Create new agent.</a><p/>").append(CRLF);
+
+						responseBuilder.append("<h2>").append("Agents").append("</h2>").append(CRLF);
+						responseBuilder.append("<pre>").append(CRLF);
+						for (String agentName : agentServers.keySet()) {
+							responseBuilder.append("<a href=\"http://").append(agentServers.get(agentName)).append("/\">");
+							responseBuilder.append(agentName).append("</a>").append(CRLF);
+						}
+						responseBuilder.append("</pre>").append(CRLF);
+						responseBuilder.append("</body></html>").append(CRLF);			
+						String response = responseBuilder.toString();
+						writeOkHeader(response.length(), mimeTypes.get("html"), writer);
+						writer.print(response);
+						writer.print(CRLF);
+						writer.flush();
+						return;
+					}
+					// Start new agent request from browser.
 			    	// Parse request parameters.
 					Map<String,String> paramMap = parseParams(tokens.get(1));
 			    	
@@ -519,6 +550,9 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("192.168.3.100"
 			    	// Parse request parameters.
 					Map<String,String> paramMap = parseParams(command);
 			    	
+					// Remove from map of hosted agents.
+					agentServers.remove(paramMap.get(NAME));
+
 					// Query list of host servers to randomly migrate to.
 	    			String nameServerRequest = QUERY_HOST_SERVERS + CRLF;
 					List<String> response = genericRequest(nameServerHost, nameServerPort, nameServerRequest);
@@ -557,6 +591,9 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("192.168.3.100"
 					AgentState agentState = new AgentState(paramMap.get(NAME), Integer.parseInt(paramMap.get(COUNT)));
 					agentState.addNameValueParams(paramMap);
 				
+					// Add agent to map of hosted agents.
+					agentServers.put(paramMap.get(NAME), hostServerHost + ':' + agentPort);
+
 					// Start Agent listener thread.
 					new Thread(new Server(agentPort, new AgentServerStrategy(agentState, hostServerHost, agentPort, server.getPortNum()))).start();
 					System.out.println("Hosting Agent at: " + hostServerHost + ':' + agentPort);
@@ -612,9 +649,7 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("192.168.3.100"
 			this.hostServerPort = hostServerPort;
 			
 			timer = new Timer();
-			timer.schedule(new AgentMigratorTimerTask(hostServer, agentServerPort, timer), 30000);
-//			new Thread(new Worker(null, new AgentMigratorStrategy(hostServer, agentServerPort), server)).start();
-//			public Worker(Socket socket, ServerStrategy serverStrategy, Server server) {
+//			timer.schedule(new AgentMigratorTimerTask(hostServer, agentServerPort, timer), 30000);
 		}
 
 		/** Echo type name specific for this strategy. */
@@ -1026,11 +1061,14 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("192.168.3.100"
 		
 		public void addNameValueParams(Map<String,String> input) {
 			contents.putAll(input);
-			// Remove reserved keys.
-			contents.remove(NAME);
-			contents.remove(VALUE);
-			contents.remove(INPUT);
-			contents.remove(COUNT);
+			for (String name : contents.keySet()) {
+				// Skip reserved parameters.
+				if (NAME.equalsIgnoreCase(name) || VALUE.equalsIgnoreCase(name) || INPUT.equalsIgnoreCase(name) || COUNT.equalsIgnoreCase(name)) {
+					continue;
+				}
+				String value = contents.get(name);
+				contents.put(name, value.replace("+", " "));
+			}
 		}
 		
 		public String renderNameValueParams() {
@@ -1044,7 +1082,7 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("192.168.3.100"
 					builder.append('&');
 				}
 				String value = contents.get(name);
-				builder.append(name).append('=').append(value);
+				builder.append(name).append('=').append(value.replace(" ", "%20"));
 			}
 			
 			return builder.toString();
