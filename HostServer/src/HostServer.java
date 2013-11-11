@@ -35,7 +35,6 @@ Notes:
 
 ----------------------------------------------------------*/
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -47,6 +46,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
  * The server simulates hosting agents on different ports.
@@ -60,14 +61,11 @@ public class HostServer {
 	/** Default Host Server port to bind. */
 	private static final int DEFAULT_NAME_SERVER_PORT = 48050;
 	
-	/** Initial agent port to bind. */
-	private static int AG_PORT = 3000;
-	
 	/** Server thread timeout. */
 	private static final int TIMEOUT = 2000;
 	
 	/** Path separator. */
-	private static final char PATH_SEP = File.separator.charAt(0);
+//	private static final char PATH_SEP = File.separator.charAt(0);
 	
 	/** Backslash file separator? */
 	private static final char SLASH = '/';
@@ -81,14 +79,14 @@ public class HostServer {
 	/** HOST_HEADER */
 	private static final String HOST_HEADER = "Host: ";
 	
-	/** index.html */
+	/** favicon.ico */
 	private static final String FAV_ICON = "favicon.ico";
-	
-	/** index.html */
-	private static final String INDEX_HTML = "index.html";
 	
 	/** Name parameter. */
 	private static final String NAME = "name";
+	
+	/** Value parameter. */
+	private static final String VALUE = "value";
 	
 	/** Input parameter. */
 	private static final String INPUT = "input";
@@ -97,10 +95,13 @@ public class HostServer {
 	private static final String COUNT = "count";
 	
 	/** Migrate command. */
-	private static final String MIGRATE = "migrate";
+	private static final String MIGRATE = "Migrate";
 	
-	/** Agent state. */
-	private static final String AGENT = "agent";
+	/** Host Agent command. */
+	private static final String HOST_AGENT = "HostAgent";	
+	
+	/** Agent parameter. */
+//	private static final String AGENT = "Agent";
 	
 	/** OK Response Code. */
 	private static final int OK = 200;
@@ -180,11 +181,15 @@ public class HostServer {
 		serverState = new ServerState();
 		
 		// Start Name Server listener thread.
-		new Thread(new Server(DEFAULT_NAME_SERVER_PORT, NAME_SERVER_STRATEGY)).start();
+		new Thread(new Server(nameServerPort, NAME_SERVER_STRATEGY)).start();
 		
 		// Start Host Server listener thread.
-		new Thread(new Server(DEFAULT_HOST_SERVER_PORT, new HostServerStrategy(hostServerHost, hostServerPort, nameServerHost, nameServerPort))).start();
+		new Thread(new Server(hostServerPort, new HostServerStrategy(hostServerHost, hostServerPort, nameServerHost, nameServerPort))).start();
 		
+// Start test Host Server listeners.
+new Thread(new Server(hostServerPort + 1, new HostServerStrategy("127.0.0.1", hostServerPort + 1, nameServerHost, nameServerPort))).start();
+new Thread(new Server(hostServerPort + 2, new HostServerStrategy("192.168.3.100", hostServerPort + 2, nameServerHost, nameServerPort))).start();
+
 		// Loop until interrupted to end.
 		while (serverState.isControlSwitch()) {
 			try {
@@ -233,7 +238,7 @@ public class HostServer {
 		public void setServerStrategy(ServerStrategy serverStrategy) {
 			this.serverStrategy = serverStrategy;
 		}
-
+		
 		/** Thread run method. Terminates upon completion. */
 		@Override
 		public void run() {
@@ -353,6 +358,28 @@ public class HostServer {
 		}
 		
 		/**
+		 * Get available port for binding server.
+		 */
+		protected static int getAvailablePort() {
+			int port = 0;
+			ServerSocket socket = null;
+			try {
+				socket = new ServerSocket(0);
+				port = socket.getLocalPort();
+			}
+			catch (Exception ex) {
+				ex.printStackTrace();
+			}
+			finally {
+				if (socket != null) {
+					try {socket.close();} catch (IOException ex){}
+				}
+			}
+			
+			return port;
+		}
+		
+		/**
 		 * Writes error code & html back to browser.
 		 */
 		protected static void writeError(int code, String error, PrintStream writer) throws IOException {
@@ -412,7 +439,7 @@ public class HostServer {
 			this.nameServerPort = nameServerPort;
 			
 			// Register host server.
-			String registerRequest = REGISTER_HOST_SERVER + ' ' + REGISTER_HOST_SERVER + '?' + SERVER + '=' + hostServerHost + ':' + hostServerPort + CRLF;
+			String registerRequest = REGISTER_HOST_SERVER + '?' + SERVER + '=' + hostServerHost + ':' + hostServerPort + CRLF;
 			List<String> registerResponse = genericRequest(nameServerHost, nameServerPort, registerRequest);
 		}
 
@@ -422,50 +449,6 @@ public class HostServer {
 			return "Host Server";
 		}
 		
-//		/** Processes a client request specific for the host server strategy. */
-//		@Override
-//		public void processRequest(Socket socket, Server server) {
-//			BufferedReader reader =  null;
-//			PrintStream writer = null;
-//			try {
-//				// Get I/O streams from the socket.
-//				reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-//				writer = new PrintStream(socket.getOutputStream());
-//	
-//				// Read all input from client via socket.
-//				List<String> input = new ArrayList<String>();
-//				do {
-//					// Read line by line & save in list.
-//					String line = reader.readLine();
-//					input.add(line);
-//				} while (reader.ready()) ;
-//				
-//				// Process request.
-//				if (input.size() > 0) {
-//					System.out.println(input.get(0));
-//					respondToRequest(input, writer);
-//				}
-//				else {
-//		    		writeError(BAD_REQUEST, "No Request Received.", writer);
-//				}				
-//	
-//			} catch (IOException ex) {
-//				System.out.println(ex);
-//				ex.printStackTrace();
-//			}
-//			finally {
-//				if (reader != null) {
-//					try {reader.close();} catch (IOException ex) {}
-//				}
-//				if (writer != null) {
-//					writer.close();
-//				}
-//				if (socket != null) {
-//					try {socket.close();} catch (IOException ex) {}
-//				}
-//			}			
-//		}
-
 		/**
 		 * Process request string & delegate to handler functions.
 		 */
@@ -480,7 +463,8 @@ public class HostServer {
 		    		tokens.add(toker.nextToken());
 		    	}
 		    	String command = tokens.get(0);
-		    	if (!(command.equalsIgnoreCase(GET) || command.equalsIgnoreCase(MIGRATE)) || (tokens.size() > 1 && tokens.get(1).contains(FAV_ICON))) {
+		    	if (!(command.equalsIgnoreCase(GET) || command.startsWith(MIGRATE) || command.startsWith(HOST_AGENT)) 
+		    			|| (tokens.size() > 1 && tokens.get(1).contains(FAV_ICON))) {
 		    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
 		    		return;
 		    	}
@@ -494,38 +478,34 @@ public class HostServer {
 		    		}
 		    	}
 
-		    	int agentPort = ++AG_PORT;
+//++AG_PORT;
 		    	
-		    	AgentState agentState = null;
-				if (command.equalsIgnoreCase(GET)) {
-	    			String registerRequest = REGISTER_AGENT + ' ' + AGENT + '?' + SERVER + '=' + hostServerHost + ':' + agentPort + CRLF;
+//		    	AgentState agentState = null;
+				if (command.equalsIgnoreCase(GET)) {				// Start new agent request from browser.
+			    	// Parse request parameters.
+					Map<String,String> paramMap = parseParams(tokens.get(1));
+			    	
+			    	// Get next available port.
+			    	int agentPort = getAvailablePort();
+					// Register new agent with name server & receive her name.
+	    			String registerRequest = REGISTER_NEW_AGENT + '?' + SERVER + '=' + hostServerHost + ':' + agentPort + CRLF;
 					List<String> registerResponse = genericRequest(nameServerHost, nameServerPort, registerRequest);
 					String agentName = registerResponse.get(0);
 			    	// Initialize agent state.
-					agentState = new AgentState(agentName);
-				}
-				else if (command.equalsIgnoreCase(MIGRATE)) {
-					// Migrate request.
-					Map<String,String> paramMap = parseParams(tokens.get(1));
-					agentState = new AgentState(paramMap.get(NAME), paramMap.get(INPUT), Integer.parseInt(paramMap.get(COUNT)));
-	    			String migrateRequest = MIGRATE + ' ' + AGENT + '?' + NAME + '=' + agentState.getName() + '&' + SERVER + '=' + hostServerHost + ':' + agentPort + CRLF;
-					List<String> migrateResponse = genericRequest(nameServerHost, nameServerPort, migrateRequest);
-				}
-				
-				// Start Agent listener thread.
-				new Thread(new Server(agentPort, new AgentServerStrategy(agentState, server.getPortNum()))).start();
-				System.out.println("Hosting Agent at: " + host + ':' + agentPort);
-				
-				// Reply to browser client or to migration request.
-				if (!tokens.get(0).contains(MIGRATE)) {
-					// Build HTML response for browser client.
+					AgentState agentState = new AgentState(agentName);
+					
+					// Start Agent listener thread with new agent.
+					new Thread(new Server(agentPort, new AgentServerStrategy(agentState, host, agentPort, server.getPortNum()))).start();
+					System.out.println("Hosting Agent at: " + hostServerHost + ':' + agentPort);
+					
+					// Build HTML redirection response for browser client.
 					StringBuilder responseBuilder = new StringBuilder();
 					responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
 					responseBuilder.append("<html><head>").append(CRLF);
 					responseBuilder.append("<meta charset=\"UTF-8\">").append(CRLF);
-					responseBuilder.append("<meta http-equiv=\"refresh\" content=\"1;url=http://").append(host).append(':').append(agentPort).append("\">").append(CRLF);
+					responseBuilder.append("<meta http-equiv=\"refresh\" content=\"1;url=http://").append(hostServerHost).append(':').append(agentPort).append("\">").append(CRLF);
 					responseBuilder.append("<script type=\"text/javascript\">").append(CRLF);
-					responseBuilder.append("window.location.href = \"").append("http://").append(host).append(':').append(agentPort).append('"').append(CRLF);
+					responseBuilder.append("window.location.href = \"").append("http://").append(hostServerHost).append(':').append(agentPort).append('"').append(CRLF);
 					responseBuilder.append("</script>").append(CRLF);
 					responseBuilder.append("<title>Page Redirection</title>").append(CRLF);
 					responseBuilder.append("</head><body></body></html>").append(CRLF);				
@@ -533,13 +513,61 @@ public class HostServer {
 					writeOkHeader(response.length(), mimeTypes.get("html"), writer);
 					writer.print(response);
 					writer.print(CRLF);			
+					writer.flush();
 				}
-				else {
-					// Handle migration response.
-					writer.print(host + ':' + agentPort);
-					writer.print(CRLF + CRLF);
+				else if (command.startsWith(MIGRATE)) {		// Migrate request from agent.
+			    	// Parse request parameters.
+					Map<String,String> paramMap = parseParams(command);
+			    	
+					// Query list of host servers to randomly migrate to.
+	    			String nameServerRequest = QUERY_HOST_SERVERS + CRLF;
+					List<String> response = genericRequest(nameServerHost, nameServerPort, nameServerRequest);
+					// Parse response into list of host servers.
+					List<String> hostServers = parseDelimited(response.get(0), "&");
+					// Pick a random host server as migration destination.
+					String randomHostServer = hostServers.get((int)(Math.random() * hostServers.size()));
+					// Parse host server into host & port.
+					List<String> hostAndPort = parseDelimited(randomHostServer, ":");
+					String hostServerHost = hostAndPort.get(0);
+					int hostServerPort = Integer.parseInt(hostAndPort.get(1));
+					// Notify new host server to host agent.
+					AgentState agentState = new AgentState(paramMap.get(NAME), Integer.parseInt(paramMap.get(COUNT)));
+					agentState.addNameValueParams(paramMap);
+					nameServerRequest =  HOST_AGENT + '?' + NAME + '=' + agentState.getName() 
+							+ '&' + agentState.renderNameValueParams() + '&' + COUNT + '=' + agentState.getCount() + CRLF;
+					response = genericRequest(hostServerHost, hostServerPort, nameServerRequest);
+					// Receive agent port from new host server.
+					String hostServerAgentPort = response.get(0);
+					// Notify name server of agent migration.
+					nameServerRequest = MIGRATE + '?' + NAME + '=' + agentState.getName() + '&' + SERVER + '=' + hostServerHost + ':' + hostServerAgentPort + CRLF;
+					response = genericRequest(nameServerHost, nameServerPort, nameServerRequest);
+					// Handle migration response to agent.
+					writer.print(hostServerHost + ':' + hostServerAgentPort);
+					writer.print(CRLF);
+					writer.flush();
 				}
-				writer.flush();				
+				else if (command.startsWith(HOST_AGENT)) {	// Host agent request from another host server.
+			    	// Parse request parameters.
+					Map<String,String> paramMap = parseParams(command);
+			    	
+			    	// Get next available port.
+			    	int agentPort = getAvailablePort();
+			    	
+			    	// Initialize agent state.
+					AgentState agentState = new AgentState(paramMap.get(NAME), Integer.parseInt(paramMap.get(COUNT)));
+					agentState.addNameValueParams(paramMap);
+				
+					// Start Agent listener thread.
+					new Thread(new Server(agentPort, new AgentServerStrategy(agentState, hostServerHost, agentPort, server.getPortNum()))).start();
+					System.out.println("Hosting Agent at: " + hostServerHost + ':' + agentPort);
+					
+					// Respond to host server.
+	    			writer.print(agentPort);
+					writer.print(CRLF);
+					writer.flush();
+				}
+				
+				
 			} catch (IOException ex) {
 				ex.printStackTrace();
 			}
@@ -569,12 +597,24 @@ public class HostServer {
 		/** Agent state. */
 		private AgentState agentState;		
 		
-		/** Agent state. */
-		private int hostServerPort;		
+		/** Host server. */
+//		private String hostServer;		
 		
-		public AgentServerStrategy(AgentState agentState, int hostServerPort) {
+		/** Host server port. */
+		private int hostServerPort;
+		
+		/** Migration timer. */
+		Timer timer;
+		
+		public AgentServerStrategy(AgentState agentState, String hostServer, int agentServerPort, int hostServerPort) {
 			this.agentState = agentState;
+//			this.hostServer = hostServer;
 			this.hostServerPort = hostServerPort;
+			
+			timer = new Timer();
+			timer.schedule(new AgentMigratorTimerTask(hostServer, agentServerPort, timer), 30000);
+//			new Thread(new Worker(null, new AgentMigratorStrategy(hostServer, agentServerPort), server)).start();
+//			public Worker(Socket socket, ServerStrategy serverStrategy, Server server) {
 		}
 
 		/** Echo type name specific for this strategy. */
@@ -582,51 +622,6 @@ public class HostServer {
 		public String getTypeName() {
 			return "Agent Server";
 		}
-		
-//		/** Processes a client request specific for the agent server strategy. */
-//		@Override
-//		public void processRequest(Socket socket, Server server) {
-//			BufferedReader reader =  null;
-//			PrintStream writer = null;
-//			try {
-//				// Get I/O streams from the socket.
-//				reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-//				writer = new PrintStream(socket.getOutputStream());
-//
-//				// Read all input from back channel browser via socket.
-//				List<String> input = new ArrayList<String>();
-//				do {
-//					// Read line by line & save in list.
-//					String line = reader.readLine();
-//					input.add(line);
-//				} while (reader.ready()) ;
-//				
-//				// Process request.
-//				if (input.size() > 0) {
-//					System.out.println(input.get(0));
-//					respondToRequest(input, writer, server);
-//				}
-//				else {
-//		    		writeError(BAD_REQUEST, "No Request Received.", writer);
-//				}				
-//
-//				writer.flush();				
-//			} catch (IOException ex) {
-//				System.out.println(ex);
-//				ex.printStackTrace();
-//			}
-//			finally {
-//				if (reader != null) {
-//					try {reader.close();} catch (IOException ex) {}
-//				}
-//				if (writer != null) {
-//					writer.close();
-//				}
-//				if (socket != null) {
-//					try {socket.close();} catch (IOException ex) {}
-//				}
-//			}			
-//		}
 		
 		/**
 		 * Process request string & delegate to handler functions.
@@ -662,17 +657,19 @@ public class HostServer {
 	    	
     		// Check for migration request.
     		if (MIGRATE.equalsIgnoreCase(input)) {
+    			// Cancel migration timer.
+    			timer.cancel();
     			// Request migration location from nameserver.
-    			String migrateRequest = MIGRATE + ' ' + AGENT + '?' + NAME + '=' + agentState.getName() + '&' + 
-    					INPUT + '=' + agentState.getInput() + '&' + COUNT + '=' + agentState.getCount() + CRLF;
+    			String migrateRequest = MIGRATE + '?' + NAME + '=' + agentState.getName() + '&' + 
+    					agentState.renderNameValueParams() + '&' + COUNT + '=' + agentState.getCount() + CRLF;
     			migrateRequest += HOST_HEADER + host + ':' + port + CRLF + CRLF;
 				List<String> migrateResponse = genericRequest(host, hostServerPort, migrateRequest);
-				String response = migrateResponse.get(0);
-    			host = response.substring(0, response.lastIndexOf(':'));
-    			String newPort = response.substring(response.lastIndexOf(':')+1);
+				String forwardingAddress = migrateResponse.get(0);
+//				String newHost = forwardingAddress.substring(0, response.lastIndexOf(':'));
+//    			String newPort = forwardingAddress.substring(response.lastIndexOf(':')+1);
     			
     			// Change this server to a zombie server.
-				server.setServerStrategy(new ZombieServerStrategy(host + ':' + newPort));
+				server.setServerStrategy(new ZombieServerStrategy(host + ':' + port, forwardingAddress));
 
 				// Build HTML redirection for browser client.
 				StringBuilder responseBuilder = new StringBuilder();
@@ -685,18 +682,19 @@ public class HostServer {
 				responseBuilder.append("</script>").append(CRLF);
 				responseBuilder.append("<title>Page Redirection</title>").append(CRLF);
 				responseBuilder.append("</head><body></body></html>").append(CRLF);				
-				response = responseBuilder.toString();
+				String response = responseBuilder.toString();
 				writeOkHeader(response.length(), mimeTypes.get("html"), writer);
 				writer.print(response);
 				writer.print(CRLF);
 				writer.flush();
 	    	}
     		else {
-    			if (input != null) {
-	    	    	// Set agent input state.
-	       			agentState.setInput(input);
-	       			// Increment usage count.
-	        		agentState.incCount();
+    	    	// Set agent input state.
+       			agentState.addNameValueParams(paramMap);
+        		
+    			if (input != null && paramMap.containsKey(VALUE)) {
+    				agentState.getContents().put(input, paramMap.get(VALUE));
+            		agentState.incCount();
     			}
         		
 				// Build HTML response for browser client.
@@ -708,8 +706,11 @@ public class HostServer {
 				responseBuilder.append("<h1>").append("Agent at&nbsp;&nbsp;&nbsp;").append(host).append(':').append(port).append("</h1>").append(CRLF);
 				responseBuilder.append("<h2>").append("Agent state: ").append(agentState.getCount()).append("</h2>").append(CRLF);
 				responseBuilder.append("<form method=\"GET\" action=\"http://").append(host).append(':').append(port).append("\">").append(CRLF);
-				responseBuilder.append("Enter text or <i>migrate</i>: <input type=\"text\" name=\"").append(INPUT).append("\" size=\"20\" value=\"").append(agentState.getInput()).append("\"/><p/>").append(CRLF);
+				responseBuilder.append("Name or <i>migrate</i>: <input type=\"text\" name=\"").append(INPUT).append("\" size=\"20\" value=\"").append("").append("\"/>");
+				responseBuilder.append(" Value: <input type=\"text\" name=\"").append(VALUE).append("\" size=\"20\" value=\"").append("\"/><p/>").append(CRLF);
 				responseBuilder.append("<input type=\"submit\" value=\"Submit\"<p/>").append(CRLF);
+				responseBuilder.append("<h2>Data Values:</h2>").append(CRLF);
+				responseBuilder.append(agentState.renderHtmlTable());
 				responseBuilder.append("</form></body></html>").append(CRLF);			
 				String response = responseBuilder.toString();				
 				writeOkHeader(response.length(), mimeTypes.get("html"), writer);
@@ -717,7 +718,38 @@ public class HostServer {
 				writer.print(CRLF);
 				writer.flush();
     		}
-	    }		
+	    }
+		
+		private static class AgentMigratorTimerTask extends TimerTask {
+			/** Host server. */
+			private String agentServer;					
+			/** Host server port. */
+			private int agentServerPort;
+			/** Parent timer. */
+			private Timer timer;
+			
+			AgentMigratorTimerTask(String agentServer, int agentServerPort, Timer timer) {
+				this.agentServer = agentServer;
+				this.agentServerPort = agentServerPort;
+				this.timer = timer;
+				System.out.println("Timer loaded.");
+			}
+			
+			public void run() {
+				System.out.println("Timer fired.");
+				StringBuilder migrateRequest = new StringBuilder();
+				migrateRequest.append("GET /?input=migrate HTTP/1.1").append(CRLF);
+				migrateRequest.append("Host: ").append(agentServer).append(':').append(agentServerPort).append(CRLF);
+				migrateRequest.append("User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:25.0) Gecko/20100101 Firefox/25.0").append(CRLF);
+				migrateRequest.append("Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*//*;q=0.8").append(CRLF);
+				migrateRequest.append("Accept-Language: en-US,en;q=0.5").append(CRLF);
+				migrateRequest.append("Accept-Encoding: gzip, deflate").append(CRLF);
+				migrateRequest.append("Connection: close").append(CRLF).append(CRLF);
+				
+				List<String> migrateResponse = genericRequest(agentServer, agentServerPort, migrateRequest.toString());
+				timer.cancel();
+			}
+		}		
 	}
 	
 	/**
@@ -725,10 +757,14 @@ public class HostServer {
 	 * Part of Strategy pattern.
 	 */
 	private static class ZombieServerStrategy extends AbstractServerStrategy {
+		/** Former address from which this agent migrated (server:port). */
+		private String formerAddress;		
+		
 		/** Forwarding address where this agent migrated (server:port). */
 		private String forwardingAddress;		
 		
-		public ZombieServerStrategy(String forwardingAddress) {
+		public ZombieServerStrategy(String formerAddress, String forwardingAddress) {
+			this.formerAddress = formerAddress;
 			this.forwardingAddress = forwardingAddress;
 		}
 
@@ -764,12 +800,12 @@ public class HostServer {
 	    			break;
 	    		}
 	    	}
-			System.out.println("Zombie forwarding from: " + host + ':' + port + " to: " + forwardingAddress);
+			System.out.println("Zombie forwarding from: " + formerAddress + " to: " + forwardingAddress);
 
 			// Parse input parameters.
 			String params = "";
-			if (request.contains("?")) {
-				params = request.substring(request.indexOf('?'));
+			if (tokens.get(1).contains("?")) {
+				params = tokens.get(1).substring(tokens.get(1).indexOf('?'));
 			}
 
 //			Map<String,String> paramMap = parseParams(tokens.get(1));
@@ -797,8 +833,9 @@ public class HostServer {
 	    }		
 	}
 	
+	private static String QUERY_HOST_SERVERS = "QueryHostServers";
 	private static String REGISTER_HOST_SERVER = "RegisterHostServer";
-	private static String REGISTER_AGENT = "RegisterAgent";
+	private static String REGISTER_NEW_AGENT = "RegisterNewAgent";
 	private static String SERVER = "server";
 	private static String SUCCESS = "success";
 
@@ -835,99 +872,23 @@ public class HostServer {
 	    		tokens.add(toker.nextToken());
 	    	}
 	    	String command = tokens.get(0);
-	    	if (!(command.equalsIgnoreCase(GET) || command.equalsIgnoreCase(REGISTER_HOST_SERVER) || command.equalsIgnoreCase(REGISTER_AGENT) 
-	    			|| command.equalsIgnoreCase(MIGRATE)) || (tokens.size() > 1 && tokens.get(1).contains(FAV_ICON))) {
+	    	if (!(command.equalsIgnoreCase(GET) || command.startsWith(REGISTER_HOST_SERVER) || command.startsWith(QUERY_HOST_SERVERS) 
+	    			|| command.startsWith(REGISTER_NEW_AGENT) || command.startsWith(MIGRATE)) || (tokens.size() > 1 && tokens.get(1).contains(FAV_ICON))) {
 	    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
 	    		return;
 	    	}
-	    	String uri = tokens.get(1);
+//	    	String uri = (tokens.size() > 1) ? tokens.get(1) : "";
 	    	
 	    	// Handle a GET by listing all host servers & agents.
 	    	if (command.equalsIgnoreCase(GET)) {
-	    		processGetRequest(writer);
-	    		return;
+	    		handleGetRequest(writer);
 	    	}
-	    	
-	    	// Parse host name & port from headers.
-//	    	String host = null, port = null;
-//	    	for (String header : fullRequest) {
-//	    		if (header.contains(HOST_HEADER)) {
-//	    			host = header.substring(HOST_HEADER.length(), header.lastIndexOf(':'));
-//	    			port = header.substring(header.lastIndexOf(':')+1);
-//	    			break;
-//	    		}
-//	    	}
-	    	
-			// Parse input parameters.
-			Map<String,String> paramMap = parseParams(tokens.get(1));
-			
-	    	if (command.equalsIgnoreCase(REGISTER_HOST_SERVER)) {
-	    		// Get host server endpoint from request parameters.
-	    		String hostServer = paramMap.get(SERVER);
-	    		if (hostServer == null) {
-		    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
-		    		return;
-	    		}	    			
-    			hostServers.add(hostServer);
-    			System.out.println("Register host server: " + hostServer);
-    			
-    			// Success response.
-    			writer.print(SUCCESS);
-	    	}
-	    	else if (command.equalsIgnoreCase(REGISTER_AGENT)) {
-	    		// Get agent server endpoint from request parameters.
-	    		String agentServer = paramMap.get(SERVER);
-	    		if (agentServer == null) {
-		    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
-		    		return;
-	    		}	    			
-    			String agentName = getUniqueName();
-    			agentServers.put(agentName, agentServer);
-    			System.out.println("Register agent: " + agentName + " at server: " + agentServer);
-    			
-    			// Name response.
-    			writer.print(agentName);
-	    	}
-	    	else if (command.equalsIgnoreCase(MIGRATE)) {
-	    		// Get agent name from request parameters.
-	    		String agentName = paramMap.get(NAME);
-	    		// Get new agent server endpoint from request parameters.
-	    		String agentServer = paramMap.get(SERVER);
-	    		if (agentName == null || agentServer == null) {
-		    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
-		    		return;
-	    		}	    			
-    			agentServers.put(agentName, agentServer);
-    			System.out.println("Migrate agent: " + agentName + " to server: " + agentServer);
-    			
-    			// Success response.
-    			writer.print(SUCCESS);
-	    	}
-	    	
-	    	// Complete response.
-			writer.print(CRLF + CRLF);
-			writer.flush();
-			
-//				// Build HTML response for browser client.
-//				StringBuilder responseBuilder = new StringBuilder();
-//				responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
-//				responseBuilder.append("<html><head>").append(CRLF);
-//				responseBuilder.append("<title>").append("Agent at: ").append(host).append(':').append(port).append("</title>").append(CRLF);
-//				responseBuilder.append("</head><body>").append(CRLF);
-//				responseBuilder.append("<h1>").append("Agent at&nbsp;&nbsp;&nbsp;").append(host).append(':').append(port).append("</h1>").append(CRLF);
-//				responseBuilder.append("<h2>").append("Agent state: ").append(agentState.getCount()).append("</h2>").append(CRLF);
-//				responseBuilder.append("<form method=\"GET\" action=\"http://").append(host).append(':').append(port).append("\">").append(CRLF);
-//				responseBuilder.append("Enter text or <i>migrate</i>: <input type=\"text\" name=\"").append(INPUT).append("\" size=\"20\" value=\"").append(agentState.getInput()).append("\"/><p/>").append(CRLF);
-//				responseBuilder.append("<input type=\"submit\" value=\"Submit\"<p/>").append(CRLF);
-//				responseBuilder.append("</form></body></html>").append(CRLF);			
-//				String response = responseBuilder.toString();				
-//				writeOkHeader(response.length(), mimeTypes.get("html"), writer);
-//				writer.print(response);
-//				writer.print(CRLF);
-//    		}
+	    	else {
+	    		handleAdminRequest(command, request, writer);
+	    	}	    	
 	    }
 		
-		private void processGetRequest(PrintStream writer) throws IOException {
+		private void handleGetRequest(PrintStream writer) throws IOException {
 			StringBuilder responseBuilder = new StringBuilder();
 			responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
 			responseBuilder.append("<html><head>").append(CRLF);
@@ -956,6 +917,71 @@ public class HostServer {
 			writer.flush();
 		}
 		
+		private void handleAdminRequest(String command, String request, PrintStream writer) throws IOException {
+			// Parse input parameters.
+			Map<String,String> paramMap = parseParams(command);
+			
+	    	if (command.startsWith(REGISTER_HOST_SERVER)) {
+	    		// Get host server endpoint from request parameters.
+	    		String hostServer = paramMap.get(SERVER);
+	    		if (hostServer == null) {
+		    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
+		    		return;
+	    		}	    			
+    			hostServers.add(hostServer);
+    			System.out.println("Register host server: " + hostServer);
+    			
+    			// Success response.
+    			writer.print(SUCCESS);
+	    	}
+	    	else if (command.startsWith(QUERY_HOST_SERVERS)) {
+	    		// Respond with &-delimited list of host servers.
+	    		String hostServersResponse = new String();
+				for (String hostServer : hostServers) {
+					if (hostServersResponse.length() != 0) {
+						hostServersResponse += '&';
+					}
+					hostServersResponse += hostServer;
+				}
+				
+    			// Host Servers response.
+    			writer.print(hostServersResponse);
+	    	}
+	    	else if (command.startsWith(REGISTER_NEW_AGENT)) {
+	    		// Get agent server endpoint from request parameters.
+	    		String agentServer = paramMap.get(SERVER);
+	    		if (agentServer == null) {
+		    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
+		    		return;
+	    		}	    			
+    			String agentName = getUniqueName();
+    			agentServers.put(agentName, agentServer);
+    			System.out.println("Register agent: " + agentName + " at server: " + agentServer);
+    			
+    			// Name response.
+    			writer.print(agentName);
+	    	}
+	    	else if (command.startsWith(MIGRATE)) {
+	    		// Get agent name from request parameters.
+	    		String agentName = paramMap.get(NAME);
+	    		// Get new agent server endpoint from request parameters.
+	    		String agentServer = paramMap.get(SERVER);
+	    		if (agentName == null || agentServer == null) {
+		    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
+		    		return;
+	    		}	    			
+    			agentServers.put(agentName, agentServer);
+    			System.out.println("Migrate agent: " + agentName + " to server: " + agentServer);
+    			
+    			// Success response.
+    			writer.print(SUCCESS);
+	    	}
+	    	
+	    	// Complete response.
+			writer.print(CRLF);
+			writer.flush();
+		}
+		
 		private static String getUniqueName() {
 			return "" + Math.random();
 		}
@@ -968,19 +994,17 @@ public class HostServer {
 		/** Agent Name. */
 		private String name;
 		/** Agent Input. */
-		private String input;
+		private Map<String,String> contents = new HashMap<String,String>();
 		/** Agent counter. */
 		private int count;
 		
 		public AgentState(String name) {
 			this.name = name;
-			this.input = "Default";
 			this.count = 1;
 		}
 
-		public AgentState(String name, String input, int count) {
+		public AgentState(String name, int count) {
 			this.name = name;
-			this.input = input;
 			this.count = count;
 		}
 
@@ -988,14 +1012,10 @@ public class HostServer {
 			return name;
 		}
 
-		public String getInput() {
-			return input;
+		public Map<String, String> getContents() {
+			return contents;
 		}
-		
-		public void setInput(String input) {
-			this.input = input;
-		}
-		
+
 		public int getCount() {
 			return count;
 		}
@@ -1003,6 +1023,43 @@ public class HostServer {
 		public void incCount() {
 			count++;
 		}
+		
+		public void addNameValueParams(Map<String,String> input) {
+			contents.putAll(input);
+			// Remove reserved keys.
+			contents.remove(NAME);
+			contents.remove(VALUE);
+			contents.remove(INPUT);
+			contents.remove(COUNT);
+		}
+		
+		public String renderNameValueParams() {
+			boolean first = true;
+			StringBuilder builder = new StringBuilder();
+			for (String name : contents.keySet()) {
+				if (first) {
+					first = false;
+				}
+				else {
+					builder.append('&');
+				}
+				String value = contents.get(name);
+				builder.append(name).append('=').append(value);
+			}
+			
+			return builder.toString();
+		}		
+		
+		public String renderHtmlTable() {
+			StringBuilder builder = new StringBuilder();
+			builder.append("<table border='1'>").append(CRLF);
+			builder.append("<tr><td>Name</td><td>Value</td></tr>").append(CRLF);
+			for (String name : contents.keySet()) {
+				builder.append("<tr><td>").append(name).append("</td><td>").append(contents.get(name)).append("</td></tr>").append(CRLF);
+			}
+			builder.append("</table>").append(CRLF);
+			return builder.toString();
+		}		
 	}
 	
 	/**
@@ -1012,7 +1069,7 @@ public class HostServer {
     	Map<String,String> paramMap = new HashMap<String,String>(); 
 		String params;
 		// Check whether there are parameters.
-		if (!request.contains("?") || (params = request.substring(request.indexOf('?')+1)) == null || params.length() == 0) {
+		if (request == null || !request.contains("?") || (params = request.substring(request.indexOf('?')+1)) == null || params.length() == 0) {
     		return paramMap;
 		}
 		
@@ -1029,6 +1086,21 @@ public class HostServer {
     	}
     	
     	return paramMap;
+	}
+	
+	/**
+	 * Parses arbitrarily delimited string.
+	 */
+	private static List<String> parseDelimited(String input, String delimiters) {
+		List<String> tokens = new ArrayList<String>(); 
+		
+		// Tokenize the parameters out.
+    	StringTokenizer toker = new StringTokenizer(input, delimiters);
+    	while (toker.hasMoreTokens()) {
+    		tokens.add(toker.nextToken());
+    	}
+    	
+    	return tokens;
 	}
 	
 	/**
@@ -1098,6 +1170,7 @@ public class HostServer {
 		PrintStream writer = null;
 		try {
 			// Open connection to server.
+			System.out.println("server- " + server + "  port- " + port);
 			socket = new Socket(server, port);
 			// Create reader from socket input stream.
 			reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -1113,6 +1186,7 @@ public class HostServer {
 				// Read line by line & save in list.
 				String line = reader.readLine();
 				response.add(line);
+				System.out.println(line);
 			} while (reader.ready()) ;
 		} catch (IOException ex) {
 			ex.printStackTrace();
