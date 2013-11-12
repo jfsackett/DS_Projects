@@ -39,8 +39,10 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -188,7 +190,8 @@ public class HostServer {
 		
 // Start test Host Server listeners.
 new Thread(new Server(hostServerPort + 1, new HostServerStrategy("127.0.0.1", hostServerPort + 1, nameServerHost, nameServerPort))).start();
-new Thread(new Server(hostServerPort + 2, new HostServerStrategy("192.168.3.100", hostServerPort + 2, nameServerHost, nameServerPort))).start();
+new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", hostServerPort + 2, nameServerHost, nameServerPort))).start();
+//new Thread(new Server(hostServerPort + 2, new HostServerStrategy("192.168.3.100", hostServerPort + 2, nameServerHost, nameServerPort))).start();
 
 		// Loop until interrupted to end.
 		while (serverState.isControlSwitch()) {
@@ -727,8 +730,8 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("192.168.3.100"
     	    	// Set agent input state.
        			agentState.addNameValueParams(paramMap);
         		
-    			if (input != null && paramMap.containsKey(VALUE)) {
-    				agentState.getContents().put(input, paramMap.get(VALUE));
+    			if (input != null && paramMap.containsKey(VALUE)) { 
+    				agentState.getContents().put(input.replace("+", " "), paramMap.get(VALUE).replace("+", " "));
             		agentState.incCount();
     			}
         		
@@ -1060,14 +1063,14 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("192.168.3.100"
 		}
 		
 		public void addNameValueParams(Map<String,String> input) {
-			contents.putAll(input);
-			for (String name : contents.keySet()) {
+			for (String name : input.keySet()) {
 				// Skip reserved parameters.
 				if (NAME.equalsIgnoreCase(name) || VALUE.equalsIgnoreCase(name) || INPUT.equalsIgnoreCase(name) || COUNT.equalsIgnoreCase(name)) {
 					continue;
 				}
-				String value = contents.get(name);
-				contents.put(name, value.replace("+", " "));
+				String value = input.get(name);
+//				name = name.replace("+", " ");
+				contents.put(name, value); //.replace("+", " "));
 			}
 		}
 		
@@ -1082,7 +1085,7 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("192.168.3.100"
 					builder.append('&');
 				}
 				String value = contents.get(name);
-				builder.append(name).append('=').append(value.replace(" ", "%20"));
+				builder.append(name.replace(" ", "%20")).append('=').append(value.replace(" ", "%20"));
 			}
 			
 			return builder.toString();
@@ -1104,6 +1107,8 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("192.168.3.100"
 	 * Parses request parameters and returns as map.
 	 */
 	private static Map<String,String> parseParams(String request) {
+		// Decode params.
+		try {request = URLDecoder.decode(request, "UTF-8");} catch (UnsupportedEncodingException ex) {}
     	Map<String,String> paramMap = new HashMap<String,String>(); 
 		String params;
 		// Check whether there are parameters.
