@@ -101,9 +101,24 @@ public class HostServer {
 	
 	/** Host Agent command. */
 	private static final String HOST_AGENT = "HostAgent";	
+		
+	/** Query Host Servers command. */
+	private static String QUERY_HOST_SERVERS = "QueryHostServers";
 	
-	/** Agent parameter. */
-//	private static final String AGENT = "Agent";
+	/** Register Host Server command. */
+	private static String REGISTER_HOST_SERVER = "RegisterHostServer";
+	
+	/** Register New Agent command. */
+	private static String REGISTER_NEW_AGENT = "RegisterNewAgent";
+	
+	/** Success flag. */
+	private static String SUCCESS = "success";
+	
+	/** Server parameter. */
+	private static String SERVER = "server";
+	
+	/** None parameter. */
+	private static final String NONE = "None";
 	
 	/** OK Response Code. */
 	private static final int OK = 200;
@@ -480,133 +495,29 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 		    	for (String header : fullRequest) {
 		    		if (header.contains(HOST_HEADER)) {
 		    			host = header.substring(HOST_HEADER.length(), header.lastIndexOf(':'));
-//		    			break;
+		    			break;
 		    		}
-		    		System.out.println(header);
+//		    		System.out.println(header);
 		    	}
 
-//++AG_PORT;
-		    	
-//		    	AgentState agentState = null;
+		    	// Parse request parameters.
+				Map<String,String> paramMap = parseParams(command);
+				
 				if (command.equalsIgnoreCase(GET)) {
 					if ("/".equalsIgnoreCase(tokens.get(1))) {
-						// Display host server UI in browser.
-						StringBuilder responseBuilder = new StringBuilder();
-						responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
-						responseBuilder.append("<html><head>").append(CRLF);
-						responseBuilder.append("<title>").append("Host Server Manifest").append("</title>").append(CRLF);
-						responseBuilder.append("</head><body>").append(CRLF);
-						responseBuilder.append("<h1>").append("Host Server Manifest").append("</h1>").append(CRLF);
-						responseBuilder.append("<a href=\"http://").append(hostServerHost).append(':').append(hostServerPort).append("/createNew\">");
-						responseBuilder.append("Create new agent.</a><p/>").append(CRLF);
-
-						responseBuilder.append("<h2>").append("Agents").append("</h2>").append(CRLF);
-						responseBuilder.append("<pre>").append(CRLF);
-						for (String agentName : agentServers.keySet()) {
-							responseBuilder.append("<a href=\"http://").append(agentServers.get(agentName)).append("/\">");
-							responseBuilder.append(agentName).append("</a>").append(CRLF);
-						}
-						responseBuilder.append("</pre>").append(CRLF);
-						responseBuilder.append("</body></html>").append(CRLF);			
-						String response = responseBuilder.toString();
-						writeOkHeader(response.length(), mimeTypes.get("html"), writer);
-						writer.print(response);
-						writer.print(CRLF);
-						writer.flush();
-						return;
+						// Display host server console.
+						handleGetRequest(writer);
 					}
-					// Start new agent request from browser.
-			    	// Parse request parameters.
-					Map<String,String> paramMap = parseParams(tokens.get(1));
-			    	
-			    	// Get next available port.
-			    	int agentPort = getAvailablePort();
-					// Register new agent with name server & receive her name.
-	    			String registerRequest = REGISTER_NEW_AGENT + '?' + SERVER + '=' + hostServerHost + ':' + agentPort + CRLF;
-					List<String> registerResponse = genericRequest(nameServerHost, nameServerPort, registerRequest);
-					String agentName = registerResponse.get(0);
-			    	// Initialize agent state.
-					AgentState agentState = new AgentState(agentName);
-					
-					// Start Agent listener thread with new agent.
-					new Thread(new Server(agentPort, new AgentServerStrategy(agentState, host, agentPort, server.getPortNum()))).start();
-					System.out.println("Hosting Agent at: " + hostServerHost + ':' + agentPort);
-					
-					// Build HTML redirection response for browser client.
-					StringBuilder responseBuilder = new StringBuilder();
-					responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
-					responseBuilder.append("<html><head>").append(CRLF);
-					responseBuilder.append("<meta charset=\"UTF-8\">").append(CRLF);
-					responseBuilder.append("<meta http-equiv=\"refresh\" content=\"1;url=http://").append(hostServerHost).append(':').append(agentPort).append("\">").append(CRLF);
-					responseBuilder.append("<script type=\"text/javascript\">").append(CRLF);
-					responseBuilder.append("window.location.href = \"").append("http://").append(hostServerHost).append(':').append(agentPort).append('"').append(CRLF);
-					responseBuilder.append("</script>").append(CRLF);
-					responseBuilder.append("<title>Page Redirection</title>").append(CRLF);
-					responseBuilder.append("</head><body></body></html>").append(CRLF);				
-					String response = responseBuilder.toString();
-					writeOkHeader(response.length(), mimeTypes.get("html"), writer);
-					writer.print(response);
-					writer.print(CRLF);			
-					writer.flush();
+					else {
+						handleCreateAgentRequest(writer, paramMap, host, server.getPortNum());
+					}
 				}
 				else if (command.startsWith(MIGRATE)) {		// Migrate request from agent.
-			    	// Parse request parameters.
-					Map<String,String> paramMap = parseParams(command);
-			    	
-					// Remove from map of hosted agents.
-					agentServers.remove(paramMap.get(NAME));
-
-					// Query list of host servers to randomly migrate to.
-	    			String nameServerRequest = QUERY_HOST_SERVERS + CRLF;
-					List<String> response = genericRequest(nameServerHost, nameServerPort, nameServerRequest);
-					// Parse response into list of host servers.
-					List<String> hostServers = parseDelimited(response.get(0), "&");
-					// Pick a random host server as migration destination.
-					String randomHostServer = hostServers.get((int)(Math.random() * hostServers.size()));
-					// Parse host server into host & port.
-					List<String> hostAndPort = parseDelimited(randomHostServer, ":");
-					String hostServerHost = hostAndPort.get(0);
-					int hostServerPort = Integer.parseInt(hostAndPort.get(1));
-					// Notify new host server to host agent.
-					AgentState agentState = new AgentState(paramMap.get(NAME), Integer.parseInt(paramMap.get(COUNT)));
-					agentState.addNameValueParams(paramMap);
-					nameServerRequest =  HOST_AGENT + '?' + NAME + '=' + agentState.getName() 
-							+ '&' + agentState.renderNameValueParams() + '&' + COUNT + '=' + agentState.getCount() + CRLF;
-					response = genericRequest(hostServerHost, hostServerPort, nameServerRequest);
-					// Receive agent port from new host server.
-					String hostServerAgentPort = response.get(0);
-					// Notify name server of agent migration.
-					nameServerRequest = MIGRATE + '?' + NAME + '=' + agentState.getName() + '&' + SERVER + '=' + hostServerHost + ':' + hostServerAgentPort + CRLF;
-					response = genericRequest(nameServerHost, nameServerPort, nameServerRequest);
-					// Handle migration response to agent.
-					writer.print(hostServerHost + ':' + hostServerAgentPort);
-					writer.print(CRLF);
-					writer.flush();
+					handleMigrateRequest(writer, paramMap);
 				}
 				else if (command.startsWith(HOST_AGENT)) {	// Host agent request from another host server.
-			    	// Parse request parameters.
-					Map<String,String> paramMap = parseParams(command);
-			    	
-			    	// Get next available port.
-			    	int agentPort = getAvailablePort();
-			    	
-			    	// Initialize agent state.
-					AgentState agentState = new AgentState(paramMap.get(NAME), Integer.parseInt(paramMap.get(COUNT)));
-					agentState.addNameValueParams(paramMap);
-				
-					// Add agent to map of hosted agents.
-					agentServers.put(paramMap.get(NAME), hostServerHost + ':' + agentPort);
-
-					// Start Agent listener thread.
-					new Thread(new Server(agentPort, new AgentServerStrategy(agentState, hostServerHost, agentPort, server.getPortNum()))).start();
-					System.out.println("Hosting Agent at: " + hostServerHost + ':' + agentPort);
-					
-					// Respond to host server.
-	    			writer.print(agentPort);
-					writer.print(CRLF);
-					writer.flush();
-				}
-				
+					handleHostRequest(writer, paramMap, server.getPortNum());
+				}				
 				
 			} catch (IOException ex) {
 				ex.printStackTrace();
@@ -626,6 +537,126 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 			
 			System.out.println("Host Server exiting.");
 	    }
+		
+		private void handleGetRequest(PrintStream writer) throws IOException {
+			// Display host server UI in browser.
+			StringBuilder responseBuilder = new StringBuilder();
+			responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
+			responseBuilder.append("<html><head>").append(CRLF);
+			responseBuilder.append("<title>").append("Host Server ").append(hostServerHost).append(':').append(hostServerPort).append("</title>").append(CRLF);
+			responseBuilder.append("</head><body>").append(CRLF);
+			responseBuilder.append("<h1>").append("Host Server ").append(hostServerHost).append(':').append(hostServerPort).append("</h1>").append(CRLF);
+			responseBuilder.append("<a href=\"http://").append(hostServerHost).append(':').append(hostServerPort).append("/createNew\">");
+			responseBuilder.append("Create new agent.</a><p/>").append(CRLF);
+
+			responseBuilder.append("<h2>").append("Agents").append("</h2>").append(CRLF);
+			responseBuilder.append("<pre>").append(CRLF);
+			for (String agentName : agentServers.keySet()) {
+				responseBuilder.append("<a href=\"http://").append(agentServers.get(agentName)).append("/\">");
+				responseBuilder.append(agentName).append("</a>").append(CRLF);
+			}
+			responseBuilder.append("</pre>").append(CRLF);
+			responseBuilder.append("</body></html>").append(CRLF);			
+			String response = responseBuilder.toString();
+			writeOkHeader(response.length(), mimeTypes.get("html"), writer);
+			writer.print(response);
+			writer.print(CRLF);
+			writer.flush();
+		}
+
+		/** Start new agent request from browser. */
+		private void handleCreateAgentRequest(PrintStream writer, Map<String,String> paramMap, String hostServer, int hostServerPort) throws IOException {
+	    	// Get next available port.
+	    	int agentPort = getAvailablePort();
+			// Register new agent with name server & receive her name.
+			String registerRequest = REGISTER_NEW_AGENT + '?' + SERVER + '=' + hostServerHost + ':' + agentPort + CRLF;
+			List<String> registerResponse = genericRequest(nameServerHost, nameServerPort, registerRequest);
+			List<String> responseParams = parseDelimited(registerResponse.get(0), "&");
+			String agentName = responseParams.get(0);
+			String peerHostServer = responseParams.get(1);
+			List<String> peerHostAndPort = parseDelimited(peerHostServer, ":");
+			String peerServer = peerHostAndPort.get(0);
+			int peerServerPort = Integer.parseInt(peerHostAndPort.get(1));
+	    	// Initialize agent state.
+			AgentState agentState = new AgentState(agentName);
+			
+			// Start Agent listener thread with new agent.
+			new Thread(new Server(agentPort, new AgentServerStrategy(agentState, hostServer, agentPort, hostServerPort, peerServer, peerServerPort))).start();
+			System.out.println("Hosting Agent at: " + hostServerHost + ':' + agentPort);
+			
+			// Build HTML redirection response for browser client.
+			StringBuilder responseBuilder = new StringBuilder();
+			responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
+			responseBuilder.append("<html><head>").append(CRLF);
+			responseBuilder.append("<meta charset=\"UTF-8\">").append(CRLF);
+			responseBuilder.append("<meta http-equiv=\"refresh\" content=\"1;url=http://").append(hostServerHost).append(':').append(agentPort).append("\">").append(CRLF);
+			responseBuilder.append("<script type=\"text/javascript\">").append(CRLF);
+			responseBuilder.append("window.location.href = \"").append("http://").append(hostServerHost).append(':').append(agentPort).append('"').append(CRLF);
+			responseBuilder.append("</script>").append(CRLF);
+			responseBuilder.append("<title>Page Redirection</title>").append(CRLF);
+			responseBuilder.append("</head><body></body></html>").append(CRLF);				
+			String response = responseBuilder.toString();
+			writeOkHeader(response.length(), mimeTypes.get("html"), writer);
+			writer.print(response);
+			writer.print(CRLF);			
+			writer.flush();
+		}
+
+		/** Migrate agent to new endpoint. */
+		private void handleMigrateRequest(PrintStream writer, Map<String,String> paramMap) throws IOException {
+			// Remove from map of hosted agents.
+			agentServers.remove(paramMap.get(NAME));
+
+			// Query list of host servers to randomly migrate to.
+			String nameServerRequest = QUERY_HOST_SERVERS + CRLF;
+			List<String> response = genericRequest(nameServerHost, nameServerPort, nameServerRequest);
+			// Parse response into list of host servers.
+			List<String> hostServers = parseDelimited(response.get(0), "&");
+			// Pick a random host server as migration destination.
+			String randomHostServer = hostServers.get((int)(Math.random() * hostServers.size()));
+			// Parse host server into host & port.
+			List<String> hostAndPort = parseDelimited(randomHostServer, ":");
+			String hostServerHost = hostAndPort.get(0);
+			int hostServerPort = Integer.parseInt(hostAndPort.get(1));
+			// Notify new host server to host agent.
+			AgentState agentState = new AgentState(paramMap.get(NAME), Integer.parseInt(paramMap.get(COUNT)));
+			agentState.addNameValueParams(paramMap);
+			nameServerRequest =  HOST_AGENT + '?' + NAME + '=' + agentState.getName() 
+					+ '&' + agentState.renderNameValueParams() + '&' + COUNT + '=' + agentState.getCount() + CRLF;
+			response = genericRequest(hostServerHost, hostServerPort, nameServerRequest);
+			// Receive agent port from new host server.
+			String hostServerAgentPort = response.get(0);
+			// Notify name server of agent migration.
+			nameServerRequest = MIGRATE + '?' + NAME + '=' + agentState.getName() + '&' + SERVER + '=' + hostServerHost + ':' + hostServerAgentPort + CRLF;
+			response = genericRequest(nameServerHost, nameServerPort, nameServerRequest);
+			// Handle migration response to agent.
+			writer.print(hostServerHost + ':' + hostServerAgentPort);
+			writer.print(CRLF);
+			writer.flush();
+		}
+		
+    	
+		/** Host agent on ths server. */
+		private void handleHostRequest(PrintStream writer, Map<String,String> paramMap, int hostServerPort) throws IOException {
+	    	// Get next available port.
+	    	int agentPort = getAvailablePort();
+	    	
+	    	// Initialize agent state.
+			AgentState agentState = new AgentState(paramMap.get(NAME), Integer.parseInt(paramMap.get(COUNT)));
+			agentState.addNameValueParams(paramMap);
+		
+			// Add agent to map of hosted agents.
+			agentServers.put(paramMap.get(NAME), hostServerHost + ':' + agentPort);
+	
+			// Start Agent listener thread.
+			new Thread(new Server(agentPort, new AgentServerStrategy(agentState, hostServerHost, agentPort, hostServerPort))).start();
+			System.out.println("Hosting Agent at: " + hostServerHost + ':' + agentPort);
+			
+			// Respond to host server.
+			writer.print(agentPort);
+			writer.print(CRLF);
+			writer.flush();
+		}
 
 	}
 		
@@ -642,14 +673,22 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 		
 		/** Host server port. */
 		private int hostServerPort;
+
+		/** Peer server. */
+		private String peerServer;		
+		
+		/** Peer server port. */
+		private int peerServerPort;
 		
 		/** Migration timer. */
 		Timer timer;
 		
-		public AgentServerStrategy(AgentState agentState, String hostServer, int agentServerPort, int hostServerPort) {
+		public AgentServerStrategy(AgentState agentState, String hostServer, int agentServerPort, int hostServerPort, String peerServer, int peerServerPort) {
 			this.agentState = agentState;
 //			this.hostServer = hostServer;
 			this.hostServerPort = hostServerPort;
+			this.peerServer = peerServer;
+			this.peerServerPort = peerServerPort;
 			
 			timer = new Timer();
 //			timer.schedule(new AgentMigratorTimerTask(hostServer, agentServerPort, timer), 30000);
@@ -695,68 +734,76 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 	    	
     		// Check for migration request.
     		if (MIGRATE.equalsIgnoreCase(input)) {
-    			// Cancel migration timer.
-    			timer.cancel();
-    			// Request migration location from nameserver.
-    			String migrateRequest = MIGRATE + '?' + NAME + '=' + agentState.getName() + '&' + 
-    					agentState.renderNameValueParams() + '&' + COUNT + '=' + agentState.getCount() + CRLF;
-    			migrateRequest += HOST_HEADER + host + ':' + port + CRLF + CRLF;
-				List<String> migrateResponse = genericRequest(host, hostServerPort, migrateRequest);
-				String forwardingAddress = migrateResponse.get(0);
-//				String newHost = forwardingAddress.substring(0, response.lastIndexOf(':'));
-//    			String newPort = forwardingAddress.substring(response.lastIndexOf(':')+1);
-    			
-    			// Change this server to a zombie server.
-				server.setServerStrategy(new ZombieServerStrategy(host + ':' + port, forwardingAddress));
-
-				// Build HTML redirection for browser client.
-				StringBuilder responseBuilder = new StringBuilder();
-				responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
-				responseBuilder.append("<html><head>").append(CRLF);
-				responseBuilder.append("<meta charset=\"UTF-8\">").append(CRLF);
-				responseBuilder.append("<meta http-equiv=\"refresh\" content=\"1;url=http://").append(host).append(':').append(port).append("\">").append(CRLF);
-				responseBuilder.append("<script type=\"text/javascript\">").append(CRLF);
-				responseBuilder.append("window.location.href = \"").append("http://").append(host).append(':').append(port).append('"').append(CRLF);
-				responseBuilder.append("</script>").append(CRLF);
-				responseBuilder.append("<title>Page Redirection</title>").append(CRLF);
-				responseBuilder.append("</head><body></body></html>").append(CRLF);				
-				String response = responseBuilder.toString();
-				writeOkHeader(response.length(), mimeTypes.get("html"), writer);
-				writer.print(response);
-				writer.print(CRLF);
-				writer.flush();
+       			handleMigrateRequest(writer, server, host, port);
 	    	}
     		else {
-    	    	// Set agent input state.
-       			agentState.addNameValueParams(paramMap);
-        		
-    			if (input != null && paramMap.containsKey(VALUE)) { 
-    				agentState.getContents().put(input.replace("+", " "), paramMap.get(VALUE).replace("+", " "));
-            		agentState.incCount();
-    			}
-        		
-				// Build HTML response for browser client.
-				StringBuilder responseBuilder = new StringBuilder();
-				responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
-				responseBuilder.append("<html><head>").append(CRLF);
-				responseBuilder.append("<title>").append("Agent at: ").append(host).append(':').append(port).append("</title>").append(CRLF);
-				responseBuilder.append("</head><body>").append(CRLF);
-				responseBuilder.append("<h1>").append("Agent at&nbsp;&nbsp;&nbsp;").append(host).append(':').append(port).append("</h1>").append(CRLF);
-				responseBuilder.append("<h2>").append("Agent state: ").append(agentState.getCount()).append("</h2>").append(CRLF);
-				responseBuilder.append("<form method=\"GET\" action=\"http://").append(host).append(':').append(port).append("\">").append(CRLF);
-				responseBuilder.append("Name or <i>migrate</i>: <input type=\"text\" name=\"").append(INPUT).append("\" size=\"20\" value=\"").append("").append("\"/>");
-				responseBuilder.append(" Value: <input type=\"text\" name=\"").append(VALUE).append("\" size=\"20\" value=\"").append("\"/><p/>").append(CRLF);
-				responseBuilder.append("<input type=\"submit\" value=\"Submit\"<p/>").append(CRLF);
-				responseBuilder.append("<h2>Data Values:</h2>").append(CRLF);
-				responseBuilder.append(agentState.renderHtmlTable());
-				responseBuilder.append("</form></body></html>").append(CRLF);			
-				String response = responseBuilder.toString();				
-				writeOkHeader(response.length(), mimeTypes.get("html"), writer);
-				writer.print(response);
-				writer.print(CRLF);
-				writer.flush();
-    		}
+    			handleGetRequest(writer, input, paramMap, host, port);
+     		}
 	    }
+		
+		private void handleGetRequest(PrintStream writer, String input, Map<String,String> paramMap, String host, String port) throws IOException {
+   	    	// Set agent input state.
+   			agentState.addNameValueParams(paramMap);
+    		
+			if (input != null && paramMap.containsKey(VALUE)) { 
+				agentState.getContents().put(input.replace("+", " "), paramMap.get(VALUE).replace("+", " "));
+        		agentState.incCount();
+			}
+    		
+			// Build HTML response for browser client.
+			StringBuilder responseBuilder = new StringBuilder();
+			responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
+			responseBuilder.append("<html><head>").append(CRLF);
+			responseBuilder.append("<title>").append("Agent at: ").append(host).append(':').append(port).append("</title>").append(CRLF);
+			responseBuilder.append("</head><body>").append(CRLF);
+			responseBuilder.append("<h1>").append("Agent at&nbsp;&nbsp;&nbsp;").append(host).append(':').append(port).append("</h1>").append(CRLF);
+			responseBuilder.append("<h2>").append("Agent state: ").append(agentState.getCount()).append("</h2>").append(CRLF);
+			responseBuilder.append("<form method=\"GET\" action=\"http://").append(host).append(':').append(port).append("\">").append(CRLF);
+			responseBuilder.append("Name or <i>migrate</i>: <input type=\"text\" name=\"").append(INPUT).append("\" size=\"20\" value=\"").append("").append("\"/>");
+			responseBuilder.append(" Value: <input type=\"text\" name=\"").append(VALUE).append("\" size=\"20\" value=\"").append("\"/><p/>").append(CRLF);
+			responseBuilder.append("<input type=\"submit\" value=\"Submit\"<p/>").append(CRLF);
+			responseBuilder.append("<h2>Data Values:</h2>").append(CRLF);
+			responseBuilder.append(agentState.renderHtmlTable());
+			responseBuilder.append("</form></body></html>").append(CRLF);			
+			String response = responseBuilder.toString();				
+			writeOkHeader(response.length(), mimeTypes.get("html"), writer);
+			writer.print(response);
+			writer.print(CRLF);
+			writer.flush();
+		}
+		
+		private void handleMigrateRequest(PrintStream writer, Server server, String host, String port) throws IOException {
+			// Cancel migration timer.
+			timer.cancel();
+			// Request migration location from nameserver.
+			String migrateRequest = MIGRATE + '?' + NAME + '=' + agentState.getName() + '&' + 
+					agentState.renderNameValueParams() + '&' + COUNT + '=' + agentState.getCount() + CRLF;
+			migrateRequest += HOST_HEADER + host + ':' + port + CRLF + CRLF;
+			List<String> migrateResponse = genericRequest(host, hostServerPort, migrateRequest);
+			String forwardingAddress = migrateResponse.get(0);
+//			String newHost = forwardingAddress.substring(0, response.lastIndexOf(':'));
+//			String newPort = forwardingAddress.substring(response.lastIndexOf(':')+1);
+			
+			// Change this server to a zombie server.
+			server.setServerStrategy(new ZombieServerStrategy(host + ':' + port, forwardingAddress));
+
+			// Build HTML redirection for browser client.
+			StringBuilder responseBuilder = new StringBuilder();
+			responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
+			responseBuilder.append("<html><head>").append(CRLF);
+			responseBuilder.append("<meta charset=\"UTF-8\">").append(CRLF);
+			responseBuilder.append("<meta http-equiv=\"refresh\" content=\"1;url=http://").append(host).append(':').append(port).append("\">").append(CRLF);
+			responseBuilder.append("<script type=\"text/javascript\">").append(CRLF);
+			responseBuilder.append("window.location.href = \"").append("http://").append(host).append(':').append(port).append('"').append(CRLF);
+			responseBuilder.append("</script>").append(CRLF);
+			responseBuilder.append("<title>Page Redirection</title>").append(CRLF);
+			responseBuilder.append("</head><body></body></html>").append(CRLF);				
+			String response = responseBuilder.toString();
+			writeOkHeader(response.length(), mimeTypes.get("html"), writer);
+			writer.print(response);
+			writer.print(CRLF);
+			writer.flush();
+		}
 		
 		private static class AgentMigratorTimerTask extends TimerTask {
 			/** Host server. */
@@ -871,11 +918,6 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 	    }		
 	}
 	
-	private static String QUERY_HOST_SERVERS = "QueryHostServers";
-	private static String REGISTER_HOST_SERVER = "RegisterHostServer";
-	private static String REGISTER_NEW_AGENT = "RegisterNewAgent";
-	private static String SERVER = "server";
-	private static String SUCCESS = "success";
 
 	/**
 	 * Implementation for processing Name Server client requests.
@@ -986,18 +1028,20 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
     			writer.print(hostServersResponse);
 	    	}
 	    	else if (command.startsWith(REGISTER_NEW_AGENT)) {
+	    		// Find a peer if one exists.
+	    		String peerAgentServer = (agentServers.isEmpty()) ? NONE : agentServers.get(1);
 	    		// Get agent server endpoint from request parameters.
 	    		String agentServer = paramMap.get(SERVER);
 	    		if (agentServer == null) {
 		    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
 		    		return;
-	    		}	    			
+	    		}
     			String agentName = getUniqueName();
     			agentServers.put(agentName, agentServer);
     			System.out.println("Register agent: " + agentName + " at server: " + agentServer);
     			
     			// Name response.
-    			writer.print(agentName);
+    			writer.print(agentName + '&' + peerAgentServer);
 	    	}
 	    	else if (command.startsWith(MIGRATE)) {
 	    		// Get agent name from request parameters.
