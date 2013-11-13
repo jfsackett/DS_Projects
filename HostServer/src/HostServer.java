@@ -101,7 +101,7 @@ public class HostServer {
 	
 	/** Host Agent command. */
 	private static final String HOST_AGENT = "HostAgent";	
-		
+	
 	/** Query Host Servers command. */
 	private static String QUERY_HOST_SERVERS = "QueryHostServers";
 	
@@ -117,6 +117,9 @@ public class HostServer {
 	/** Server parameter. */
 	private static String SERVER = "server";
 	
+	/** Peer host server parameter. */
+	private static final String PEER_HOST = "PEER_HOST";
+		
 	/** None parameter. */
 	private static final String NONE = "None";
 	
@@ -636,7 +639,7 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 		}
 		
     	
-		/** Host agent on ths server. */
+		/** Host agent on this server. */
 		private void handleHostRequest(PrintStream writer, Map<String,String> paramMap, int hostServerPort) throws IOException {
 	    	// Get next available port.
 	    	int agentPort = getAvailablePort();
@@ -644,12 +647,17 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 	    	// Initialize agent state.
 			AgentState agentState = new AgentState(paramMap.get(NAME), Integer.parseInt(paramMap.get(COUNT)));
 			agentState.addNameValueParams(paramMap);
-		
+
+			String peerHostServer = paramMap.get(PEER_HOST);
+			List<String> peerHostAndPort = parseDelimited(peerHostServer, ":");
+			String peerServer = peerHostAndPort.get(0);
+			int peerServerPort = Integer.parseInt(peerHostAndPort.get(1));
+			
 			// Add agent to map of hosted agents.
 			agentServers.put(paramMap.get(NAME), hostServerHost + ':' + agentPort);
 	
 			// Start Agent listener thread.
-			new Thread(new Server(agentPort, new AgentServerStrategy(agentState, hostServerHost, agentPort, hostServerPort))).start();
+			new Thread(new Server(agentPort, new AgentServerStrategy(agentState, hostServerHost, agentPort, hostServerPort, peerServer, peerServerPort))).start();
 			System.out.println("Hosting Agent at: " + hostServerHost + ':' + agentPort);
 			
 			// Respond to host server.
