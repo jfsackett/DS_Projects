@@ -111,6 +111,15 @@ public class HostServer {
 	/** Register New Agent command. */
 	private static String REGISTER_NEW_AGENT = "RegisterNewAgent";
 	
+	/** Make peer command. */
+	private static String MAKE_PEER = "makePeer";
+	
+	/** Data update command. */
+	private static String SYNC_DATA = "syncData";
+	
+	/** Data update command. */
+	private static String SYNC_PEER = "syncPeer";
+	
 	/** Success flag. */
 	private static String SUCCESS = "success";
 	
@@ -118,7 +127,10 @@ public class HostServer {
 	private static String SERVER = "server";
 	
 	/** Peer host server parameter. */
-	private static final String PEER_HOST = "PEER_HOST";
+	private static final String PEER_HOST = "peerHost";
+		
+	/** Old Peer host server parameter. */
+	private static final String PEER_HOST_OLD = "peerHostOld";
 		
 	/** None parameter. */
 	private static final String NONE = "None";
@@ -353,7 +365,9 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 				do {
 					// Read line by line & save in list.
 					String line = reader.readLine();
-					input.add(line);
+					if (line != null) {
+						input.add(line);
+					}
 				} while (reader.ready()) ;
 				
 				// Process request.
@@ -575,17 +589,25 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 			String registerRequest = REGISTER_NEW_AGENT + '?' + SERVER + '=' + hostServerHost + ':' + agentPort + CRLF;
 			List<String> registerResponse = genericRequest(nameServerHost, nameServerPort, registerRequest);
 			List<String> responseParams = parseDelimited(registerResponse.get(0), "&");
+			// Retrieve agent name.
 			String agentName = responseParams.get(0);
-			String peerHostServer = responseParams.get(1);
-			List<String> peerHostAndPort = parseDelimited(peerHostServer, ":");
+			// Retrieve peer endpoint.
+			String peerEndpoint = responseParams.get(1);
+			List<String> peerHostAndPort = parseDelimited(peerEndpoint, ":");
 			String peerServer = peerHostAndPort.get(0);
 			int peerServerPort = Integer.parseInt(peerHostAndPort.get(1));
-	    	// Initialize agent state.
+			
+			// Add agent to map of hosted agents.
+			agentServers.put(agentName, hostServerHost + ':' + agentPort);
+
+			// Initialize agent state.
 			AgentState agentState = new AgentState(agentName);
 			
 			// Start Agent listener thread with new agent.
-			new Thread(new Server(agentPort, new AgentServerStrategy(agentState, hostServer, agentPort, hostServerPort, peerServer, peerServerPort))).start();
+			AgentServerStrategy strategy = new AgentServerStrategy(agentState, hostServer, agentPort, hostServerPort, peerServer, peerServerPort);
+			new Thread(new Server(agentPort, strategy)).start();
 			System.out.println("Hosting Agent at: " + hostServerHost + ':' + agentPort);
+			strategy.initializeAgent(null);
 			
 			// Build HTML redirection response for browser client.
 			StringBuilder responseBuilder = new StringBuilder();
@@ -609,6 +631,12 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 		private void handleMigrateRequest(PrintStream writer, Map<String,String> paramMap) throws IOException {
 			// Remove from map of hosted agents.
 			agentServers.remove(paramMap.get(NAME));
+			
+			// Retrieve peer endpoint.
+			String peerEndpoint = paramMap.get(PEER_HOST);
+			List<String> peerHostAndPort = parseDelimited(peerEndpoint, ":");
+			String peerServer = peerHostAndPort.get(0);
+			int peerServerPort = Integer.parseInt(peerHostAndPort.get(1));
 
 			// Query list of host servers to randomly migrate to.
 			String nameServerRequest = QUERY_HOST_SERVERS + CRLF;
@@ -621,11 +649,15 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 			List<String> hostAndPort = parseDelimited(randomHostServer, ":");
 			String hostServerHost = hostAndPort.get(0);
 			int hostServerPort = Integer.parseInt(hostAndPort.get(1));
+			
+			// Retrieve former host..
+			String exHost = paramMap.get(PEER_HOST_OLD);
+
 			// Notify new host server to host agent.
 			AgentState agentState = new AgentState(paramMap.get(NAME), Integer.parseInt(paramMap.get(COUNT)));
 			agentState.addNameValueParams(paramMap);
-			nameServerRequest =  HOST_AGENT + '?' + NAME + '=' + agentState.getName() 
-					+ '&' + agentState.renderNameValueParams() + '&' + COUNT + '=' + agentState.getCount() + CRLF;
+			nameServerRequest =  HOST_AGENT + '?' + NAME + '=' + agentState.getName() + '&' + agentState.renderNameValueParams() + '&' 
+							+ COUNT + '=' + agentState.getCount() + '&' + PEER_HOST + '=' + peerServer + ':' + peerServerPort + '&' + PEER_HOST_OLD + '=' + exHost + CRLF;
 			response = genericRequest(hostServerHost, hostServerPort, nameServerRequest);
 			// Receive agent port from new host server.
 			String hostServerAgentPort = response.get(0);
@@ -648,17 +680,23 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 			AgentState agentState = new AgentState(paramMap.get(NAME), Integer.parseInt(paramMap.get(COUNT)));
 			agentState.addNameValueParams(paramMap);
 
-			String peerHostServer = paramMap.get(PEER_HOST);
-			List<String> peerHostAndPort = parseDelimited(peerHostServer, ":");
+			// Retrieve peer endpoint.
+			String peerEndpoint = paramMap.get(PEER_HOST);
+			List<String> peerHostAndPort = parseDelimited(peerEndpoint, ":");
 			String peerServer = peerHostAndPort.get(0);
 			int peerServerPort = Integer.parseInt(peerHostAndPort.get(1));
+			
+			// Retrieve former host..
+			String exHost = paramMap.get(PEER_HOST_OLD);
 			
 			// Add agent to map of hosted agents.
 			agentServers.put(paramMap.get(NAME), hostServerHost + ':' + agentPort);
 	
 			// Start Agent listener thread.
-			new Thread(new Server(agentPort, new AgentServerStrategy(agentState, hostServerHost, agentPort, hostServerPort, peerServer, peerServerPort))).start();
+			AgentServerStrategy strategy = new AgentServerStrategy(agentState, hostServerHost, agentPort, hostServerPort, peerServer, peerServerPort);
+			new Thread(new Server(agentPort, strategy)).start();
 			System.out.println("Hosting Agent at: " + hostServerHost + ':' + agentPort);
+			strategy.initializeAgent(exHost);
 			
 			// Respond to host server.
 			writer.print(agentPort);
@@ -677,8 +715,11 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 		private AgentState agentState;		
 		
 		/** Host server. */
-//		private String hostServer;		
+		private String hostServer;
 		
+		/** Agent server port. */
+		private int agentServerPort;
+
 		/** Host server port. */
 		private int hostServerPort;
 
@@ -693,19 +734,48 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 		
 		public AgentServerStrategy(AgentState agentState, String hostServer, int agentServerPort, int hostServerPort, String peerServer, int peerServerPort) {
 			this.agentState = agentState;
-//			this.hostServer = hostServer;
+			this.hostServer = hostServer;
+			this.agentServerPort = agentServerPort;
 			this.hostServerPort = hostServerPort;
 			this.peerServer = peerServer;
 			this.peerServerPort = peerServerPort;
 			
 			timer = new Timer();
-//			timer.schedule(new AgentMigratorTimerTask(hostServer, agentServerPort, timer), 30000);
+//			timer.schedule(new AgentMigratorTimerTask(hostServer, agentServerPort, timer), 30000);			
 		}
 
 		/** Echo type name specific for this strategy. */
 		@Override
 		public String getTypeName() {
 			return "Agent Server";
+		}
+		
+		/**
+		 * Initialize this Agent.
+		 */
+		public void initializeAgent(String peerHostOld) {
+			if (!(peerServer.equalsIgnoreCase(hostServer) && peerServerPort == agentServerPort)) {
+				if (peerHostOld == null) {
+					String makePeerRequest = GET + " /" + MAKE_PEER + '?' + INPUT + '=' + MAKE_PEER + '&' + PEER_HOST + '=' + hostServer + ':' + agentServerPort + CRLF + CRLF;
+					List<String> migrateResponse = genericRequest(peerServer, peerServerPort, makePeerRequest);
+					// Retrieve peer endpoint.
+					String peerEndpoint = migrateResponse.get(0);
+					List<String> peerHostAndPort = parseDelimited(peerEndpoint, ":");
+					this.peerServer = peerHostAndPort.get(0);
+					this.peerServerPort = Integer.parseInt(peerHostAndPort.get(1));
+				}
+				else {
+					// Already has peer, tell peers about new address.
+					String syncDataRequest = GET + " /" + SYNC_PEER + '?' + PEER_HOST + '=' + hostServer + ':' + agentServerPort + '&' + PEER_HOST_OLD + '=' + peerHostOld;
+					List<String> syncResponse = genericRequest(peerServer, peerServerPort, syncDataRequest);
+				}
+				// Synchronize data.
+				String syncDataRequest = GET + " /" + SYNC_DATA + '?' + PEER_HOST + '=' + hostServer + ':' + agentServerPort;
+				//+ '?' + INPUT + '=' + MAKE_PEER + '&' + PEER_HOST + '=' + hostServer + ':' + agentServerPort + CRLF + CRLF;
+				List<String> syncResponse = genericRequest(peerServer, peerServerPort, syncDataRequest);
+				Map<String,String> paramMap = parseParams(syncResponse.get(0));
+				agentState.addNameValueParams(paramMap);
+			}			
 		}
 		
 		/**
@@ -720,42 +790,53 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 	    	while (toker.hasMoreTokens()) {
 	    		tokens.add(toker.nextToken());
 	    	}
-	    	if (tokens.size() < 3 || !tokens.get(0).equalsIgnoreCase(GET) || tokens.get(1).contains(FAV_ICON)) {
+	    	if (tokens.size() < 2 || !tokens.get(0).equalsIgnoreCase(GET) || tokens.get(1).contains(FAV_ICON)) {
 	    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
 	    		return;
 	    	}
 	    	
-	    	// Parse host name & port from headers.
-	    	String host = null, port = null;
-	    	for (String header : fullRequest) {
-	    		if (header.contains(HOST_HEADER)) {
-	    			host = header.substring(HOST_HEADER.length(), header.lastIndexOf(':'));
-	    			port = header.substring(header.lastIndexOf(':')+1);
-	    			break;
-	    		}
-	    	}
-			System.out.println("Agent working at: " + host + ':' + port);
+//	    	// Parse host name & port from headers.
+//	    	String host = null, port = null;
+//	    	for (String header : fullRequest) {
+//	    		if (header.contains(HOST_HEADER)) {
+//	    			host = header.substring(HOST_HEADER.length(), header.lastIndexOf(':'));
+//	    			port = header.substring(header.lastIndexOf(':')+1);
+//	    			break;
+//	    		}
+//	    	}
+			System.out.println("Agent working at: " + hostServer + ':' + hostServerPort);
 
 			// Parse input parameters.
 			Map<String,String> paramMap = parseParams(tokens.get(1));
 			String input = paramMap.get(INPUT);
 	    	
-    		// Check for migration request.
-    		if (MIGRATE.equalsIgnoreCase(input)) {
-       			handleMigrateRequest(writer, server, host, port);
+			if (MIGRATE.equalsIgnoreCase(input)) {		// Check for migration request.
+       			handleMigrateRequest(writer, server, hostServer, agentServerPort);
 	    	}
-    		else {
-    			handleGetRequest(writer, input, paramMap, host, port);
+			else if (tokens.get(1).startsWith("/" + MAKE_PEER)) {
+				handlePeerRequest(writer, paramMap);
+			}
+    		else if (tokens.get(1).startsWith("/" + SYNC_DATA)) {
+    			handleSyncDataRequest(writer, paramMap);
      		}
+    		else if (tokens.get(1).startsWith("/" + SYNC_PEER)) {
+    			handleSyncPeerRequest(writer, paramMap);
+     		}
+    		else {
+				handleGetRequest(writer, input, paramMap, hostServer, agentServerPort);
+			}
 	    }
 		
-		private void handleGetRequest(PrintStream writer, String input, Map<String,String> paramMap, String host, String port) throws IOException {
+		private void handleGetRequest(PrintStream writer, String input, Map<String,String> paramMap, String host, int port) throws IOException {
    	    	// Set agent input state.
    			agentState.addNameValueParams(paramMap);
     		
 			if (input != null && paramMap.containsKey(VALUE)) { 
 				agentState.getContents().put(input.replace("+", " "), paramMap.get(VALUE).replace("+", " "));
         		agentState.incCount();
+    			String makePeerRequest = GET + " /" + SYNC_DATA + '?' + PEER_HOST + '=' + hostServer + ':' + agentServerPort + '&' + agentState.renderNameValueParams();
+				//+ '?' + INPUT + '=' + MAKE_PEER + '&' + PEER_HOST + '=' + hostServer + ':' + agentServerPort + CRLF + CRLF;
+    			List<String> syncResponse = genericRequest(peerServer, peerServerPort, makePeerRequest);
 			}
     		
 			// Build HTML response for browser client.
@@ -780,15 +861,19 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 			writer.flush();
 		}
 		
-		private void handleMigrateRequest(PrintStream writer, Server server, String host, String port) throws IOException {
+		private void handleMigrateRequest(PrintStream writer, Server server, String host, int port) throws IOException {
 			// Cancel migration timer.
 			timer.cancel();
 			// Request migration location from nameserver.
-			String migrateRequest = MIGRATE + '?' + NAME + '=' + agentState.getName() + '&' + 
-					agentState.renderNameValueParams() + '&' + COUNT + '=' + agentState.getCount() + CRLF;
+			String migrateRequest = MIGRATE + '?' + NAME + '=' + agentState.getName() + '&' + agentState.renderNameValueParams() + '&' + 
+					COUNT + '=' + agentState.getCount() + '&' + PEER_HOST + '=' + peerServer + ':' + peerServerPort + '&' + PEER_HOST_OLD + '=' + hostServer + ':' + agentServerPort + CRLF;
 			migrateRequest += HOST_HEADER + host + ':' + port + CRLF + CRLF;
 			List<String> migrateResponse = genericRequest(host, hostServerPort, migrateRequest);
 			String forwardingAddress = migrateResponse.get(0);
+//			// Tell peers about new address.
+//			String syncDataRequest = GET + " /" + SYNC_PEER + '?' + PEER_HOST + '=' + forwardingAddress + '&' + PEER_HOST_OLD + '=' + hostServer + ':' + agentServerPort;
+//			List<String> syncResponse = genericRequest(peerServer, peerServerPort, syncDataRequest);
+
 //			String newHost = forwardingAddress.substring(0, response.lastIndexOf(':'));
 //			String newPort = forwardingAddress.substring(response.lastIndexOf(':')+1);
 			
@@ -809,6 +894,52 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 			String response = responseBuilder.toString();
 			writeOkHeader(response.length(), mimeTypes.get("html"), writer);
 			writer.print(response);
+			writer.print(CRLF);
+			writer.flush();
+		}
+		
+		private void handlePeerRequest(PrintStream writer, Map<String,String> paramMap) {
+			String peerEndpoint = paramMap.get(PEER_HOST);
+			List<String> peerHostAndPort = parseDelimited(peerEndpoint, ":");
+			// Write this agent's peer server to new peer.
+			writer.print(peerServer + ':' + peerServerPort + CRLF);
+			writer.print(CRLF);
+			writer.flush();
+			// Make incoming the new peer.
+			peerServer = peerHostAndPort.get(0);
+			peerServerPort = Integer.parseInt(peerHostAndPort.get(1));
+		}
+		
+		private void handleSyncDataRequest(PrintStream writer, Map<String,String> paramMap) {
+			agentState.addNameValueParams(paramMap);
+			String agentServer = hostServer + ':' + agentServerPort;
+			String startAgentServer = paramMap.get(PEER_HOST);
+			if (startAgentServer != null && startAgentServer.equalsIgnoreCase(agentServer)) {
+				return;
+			}
+			String syncDataRequest = GET + " /" + SYNC_DATA + '?' + PEER_HOST + '=' + ((startAgentServer != null) ? startAgentServer : agentServer) + '&' + agentState.renderNameValueParams();
+					//+ '?' + INPUT + '=' + MAKE_PEER + '&' + PEER_HOST + '=' + hostServer + ':' + agentServerPort + CRLF + CRLF;
+			List<String> syncResponse = genericRequest(peerServer, peerServerPort, syncDataRequest);
+//			System.out.println("Name: " + agentState.getName());
+			writer.print(SUCCESS + CRLF);
+			writer.print(CRLF);
+			writer.flush();
+		}
+		
+		private void handleSyncPeerRequest(PrintStream writer, Map<String,String> paramMap) {
+			String agentServer = hostServer + ':' + agentServerPort;
+			String newPeerServer = paramMap.get(PEER_HOST);
+			String oldPeerServer = paramMap.get(PEER_HOST_OLD);
+			if (oldPeerServer.equalsIgnoreCase(peerServer + ':' + peerServerPort)) {
+				List<String> newHostAndPort = parseDelimited(newPeerServer, ":");
+				peerServer = newHostAndPort.get(0);
+				peerServerPort = Integer.parseInt(newHostAndPort.get(1));
+			}
+			if (!newPeerServer.equalsIgnoreCase(agentServer)) {
+				String syncDataRequest = GET + " /" + SYNC_PEER + '?' + PEER_HOST + '=' + newPeerServer + '&' + PEER_HOST_OLD + '=' + oldPeerServer;
+				List<String> syncResponse = genericRequest(peerServer, peerServerPort, syncDataRequest);
+			}
+			writer.print(SUCCESS + CRLF);
 			writer.print(CRLF);
 			writer.flush();
 		}
@@ -1036,10 +1167,10 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
     			writer.print(hostServersResponse);
 	    	}
 	    	else if (command.startsWith(REGISTER_NEW_AGENT)) {
-	    		// Find a peer if one exists.
-	    		String peerAgentServer = (agentServers.isEmpty()) ? NONE : agentServers.get(1);
 	    		// Get agent server endpoint from request parameters.
 	    		String agentServer = paramMap.get(SERVER);
+	    		// Find a peer if one exists, else use itself.
+	    		String peerAgentServer = (agentServers.isEmpty()) ? agentServer : agentServers.values().iterator().next();
 	    		if (agentServer == null) {
 		    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
 		    		return;
@@ -1117,12 +1248,12 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 		public void addNameValueParams(Map<String,String> input) {
 			for (String name : input.keySet()) {
 				// Skip reserved parameters.
-				if (NAME.equalsIgnoreCase(name) || VALUE.equalsIgnoreCase(name) || INPUT.equalsIgnoreCase(name) || COUNT.equalsIgnoreCase(name)) {
+				if (NAME.equalsIgnoreCase(name) || VALUE.equalsIgnoreCase(name) || INPUT.equalsIgnoreCase(name) 
+						|| COUNT.equalsIgnoreCase(name) || PEER_HOST.equalsIgnoreCase(name) || PEER_HOST_OLD.equalsIgnoreCase(name)) {
 					continue;
 				}
 				String value = input.get(name);
-//				name = name.replace("+", " ");
-				contents.put(name, value); //.replace("+", " "));
+				contents.put(name, value);
 			}
 		}
 		
@@ -1281,7 +1412,6 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 				// Read line by line & save in list.
 				String line = reader.readLine();
 				response.add(line);
-				System.out.println(line);
 			} while (reader.ready()) ;
 		} catch (IOException ex) {
 			ex.printStackTrace();
