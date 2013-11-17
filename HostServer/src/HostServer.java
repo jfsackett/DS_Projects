@@ -1,9 +1,9 @@
 /*--------------------------------------------------------
 HostServer.java
-version 1.0
+version 2.0
 
 Joseph Sackett
-October 27, 2013
+November 15, 2013
 
 Developed and tested with JDK 1.7.0_40.
 
@@ -12,26 +12,36 @@ Build Instructions:
 javac *.java
 
 Standard Execution Instructions:
-HostServer hosts mock agents on different ports and provides access via the Firefox web browser.
-1) From a command prompt in the same directory as the build, execute:
-java HostServer
-2) Open Firefox and type this into the browser line:
-http://localhost:1565/
-3) Expect it to show the initial agent state in the browser.
-4) Change the input field so see it remember input.
-5) Note that its count increments each time input is submitted.
-6) Enter 'migrate' to move the agent to be hosted on new port.
-7) Open a second browser to start a new agent.
+HostServer hosts agents on different ports and provides access via the Firefox web browser.
+1) Make sure name server is working first.
+2) From a command prompt in the same directory as the build, execute:
+   java HostServer [host_server_port] [name_server_host] [host_server_host]
+   Note that it is very important to put in the external server names, accessible from users' browsers.
+3) Open Firefox and type this into the browser line:
+   http://[host_server_host]:45050/  or if running locally:
+   http://localhost:45050/
+4) Expect it to show the host server status page.
+5) Click on "Create new agent" link.
+6) Change the input field and hit submit so see it remember input.
+7) Note that its count increments each time input is submitted.
+8) Enter 'migrate' to move the agent to be hosted on new port.
+9) Open a second browser to start a new agent and see them synchronize data.
 
-A browser from a different machine can perform all of the same actions as long as the firewall rules permit port 1565.
+A browser from a different machine can perform all of the same actions as long as the firewall rules permit it.
 To test this, substitute the IP address or hostname of the server running HostServer for the localhost in the above instructions.
 
 Included Files:
+- checklist-agent.html
+- gradeagent.bat
 - HostServer.java 
+- NameServer.java
 - MimeTypes.txt
+- console-log.txt
+- DIADiscussion.html
 
 Notes:
-- This is a complete rewrite of the HostServer example code. It uses the MyWebServer framework and thus has some legacy code. 
+- This has much of the important functionality from the assignment complete, but not all. The DIA discussion file covers these gaps. 
+- The best way to execute the system is to run: gradeagent.bat
 
 ----------------------------------------------------------*/
 import java.io.BufferedReader;
@@ -57,116 +67,113 @@ import java.util.TimerTask;
  * @author Joseph Sackett
  */
 public class HostServer {
-	/** Default Host Server port to bind. */
-	private static final int DEFAULT_HOST_SERVER_PORT = 45050;
-	
-	/** Default Host Server port to bind. */
-	private static final int DEFAULT_NAME_SERVER_PORT = 48050;
-	
-	/** Server thread timeout. */
-	private static final int TIMEOUT = 2000;
-	
-	/** Path separator. */
-//	private static final char PATH_SEP = File.separator.charAt(0);
-	
-	/** Backslash file separator? */
-	private static final char SLASH = '/';
+	/** Backslash file separator. */
+	static final char SLASH = '/';
 		
 	/** CRLF */
-	private static final String CRLF = "\r\n";
+	static final String CRLF = "\r\n";
 	
 	/** GET */
-	private static final String GET = "GET";
+	static final String GET = "GET";
 	
 	/** HOST_HEADER */
-	private static final String HOST_HEADER = "Host: ";
+	static final String HOST_HEADER = "Host: ";
 	
 	/** favicon.ico */
-	private static final String FAV_ICON = "favicon.ico";
+	static final String FAV_ICON = "favicon.ico";
 	
 	/** Name parameter. */
-	private static final String NAME = "name";
+	static final String NAME = "name";
 	
 	/** Value parameter. */
-	private static final String VALUE = "value";
+	static final String VALUE = "value";
 	
 	/** Input parameter. */
-	private static final String INPUT = "input";
+	static final String INPUT = "input";
 	
 	/** Count parameter. */
-	private static final String COUNT = "count";
+	static final String COUNT = "count";
 	
 	/** Migrate command. */
-	private static final String MIGRATE = "Migrate";
+	static final String MIGRATE = "Migrate";
 	
 	/** Host Agent command. */
-	private static final String HOST_AGENT = "HostAgent";	
+	static final String HOST_AGENT = "HostAgent";	
 	
 	/** Query Host Servers command. */
-	private static String QUERY_HOST_SERVERS = "QueryHostServers";
+	static String QUERY_HOST_SERVERS = "QueryHostServers";
 	
 	/** Register Host Server command. */
-	private static String REGISTER_HOST_SERVER = "RegisterHostServer";
+	static String REGISTER_HOST_SERVER = "RegisterHostServer";
 	
 	/** Register New Agent command. */
-	private static String REGISTER_NEW_AGENT = "RegisterNewAgent";
+	static String REGISTER_NEW_AGENT = "RegisterNewAgent";
 	
 	/** Make peer command. */
-	private static String MAKE_PEER = "makePeer";
+	static String MAKE_PEER = "makePeer";
 	
 	/** Data update command. */
-	private static String SYNC_DATA = "syncData";
+	static String SYNC_DATA = "syncData";
 	
 	/** Data update command. */
-	private static String SYNC_PEER = "syncPeer";
+	static String SYNC_PEER = "syncPeer";
 	
 	/** Success flag. */
-	private static String SUCCESS = "success";
+	static String SUCCESS = "success";
 	
 	/** Server parameter. */
-	private static String SERVER = "server";
+	static String SERVER = "server";
 	
 	/** Peer host server parameter. */
-	private static final String PEER_HOST = "peerHost";
+	static final String PEER_HOST = "peerHost";
 		
 	/** Old Peer host server parameter. */
-	private static final String PEER_HOST_OLD = "peerHostOld";
+	static final String PEER_HOST_OLD = "peerHostOld";
 		
 	/** None parameter. */
-	private static final String NONE = "None";
+	static final String NONE = "None";
 	
 	/** OK Response Code. */
-	private static final int OK = 200;
+	static final int OK = 200;
 			
 	/** NOT FOUND Response Code. */
-	private static final int NOT_FOUND = 404;
+	static final int NOT_FOUND = 404;
 			
 	/** NO RESPONSE Response Code. */
-	private static final int NO_RESPONSE = 204;
+	static final int NO_RESPONSE = 204;
 			
 	/** BAD_REQUEST Response Code. */
-	private static final int BAD_REQUEST = 400;
+	static final int BAD_REQUEST = 400;
 			
 	/** FORBIDDEN Response Code. */
-	private static final int FORBIDDEN = 403;
+	static final int FORBIDDEN = 403;
 			
 	/** Buffer Size. */
-	private static final int BUFFER_SIZE = 1000;
-	
-	/** Host Server Strategy Singleton. */
-	private static final ServerStrategy NAME_SERVER_STRATEGY = new NameServerStrategy();
+	static final int BUFFER_SIZE = 1000;
 	
 	/** File containing file extension to mime type mappings. */
-	private static final String MIME_INPUT_FILE = "MimeTypes.txt";
+	static final String MIME_INPUT_FILE = "MimeTypes.txt";
 	
 	/** File extension to Mime type map. */
-	private static Map<String,String> mimeTypes = new HashMap<String,String>();
+	static Map<String,String> mimeTypes = new HashMap<String,String>();
 		
 	/** Code to Response string map. */
-	private static Map<Integer,String> responses = new HashMap<Integer,String>();
+	static Map<Integer,String> responses = new HashMap<Integer,String>();
 		
 	/** Global mode for the server. Thread safe. */
-	private static ServerState serverState;
+	static ServerState serverState;
+	
+	/** Default Host Server port to bind. */
+	static final int DEFAULT_HOST_SERVER_PORT = 45050;
+	
+	/** Default Host Server port to bind. */
+	static final int DEFAULT_NAME_SERVER_PORT = 48050;
+	
+	/** Server thread timeout. */
+	static final int TIMEOUT = 60000;
+	
+	/** Chance the agent migrates. */
+	static double MIGRATE_CHANCE = .1;
 	
 	/** Static block run when class loaded. */
 	static {
@@ -184,7 +191,7 @@ public class HostServer {
 	 * - Loop continually, spawning workers for each connection.
 	 */
 	public static void main(String[] args) {
-		System.out.println("Joe Sackett's DIA Servers.");
+		System.out.println("Joe Sackett's DIA Host Server.");
 		
 		String nameServerHost = "localhost";
 		int nameServerPort = DEFAULT_NAME_SERVER_PORT;
@@ -192,15 +199,15 @@ public class HostServer {
 		int hostServerPort = DEFAULT_HOST_SERVER_PORT;
 		switch(args.length) {
 		case 3:
-			try{hostServerPort = Integer.getInteger(args[2]);}catch(NumberFormatException ex) {}
+			hostServerHost = args[2];
 		case 2:
-			hostServerHost = args[1];
+			nameServerHost = args[1];
 		case 1:
-			nameServerHost = args[0];
+			try{hostServerPort = Integer.parseInt(args[0]);}catch(NumberFormatException ex) {}
 		case 0:
 			break;
 		default:
-			System.out.println("Usage:\njava HostServer [name_server_host] [host_server_host] [host_server_port]");
+			System.out.println("Usage:\njava HostServer [host_server_port] [name_server_host] [host_server_host]");
 			System.exit(1);
 		}
 		System.out.println("Name Server: " + nameServerHost + ':' + nameServerPort);
@@ -212,17 +219,9 @@ public class HostServer {
 		// Initialize server state.
 		serverState = new ServerState();
 		
-		// Start Name Server listener thread.
-		new Thread(new Server(nameServerPort, NAME_SERVER_STRATEGY)).start();
-		
 		// Start Host Server listener thread.
 		new Thread(new Server(hostServerPort, new HostServerStrategy(hostServerHost, hostServerPort, nameServerHost, nameServerPort))).start();
 		
-// Start test Host Server listeners.
-new Thread(new Server(hostServerPort + 1, new HostServerStrategy("127.0.0.1", hostServerPort + 1, nameServerHost, nameServerPort))).start();
-new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", hostServerPort + 2, nameServerHost, nameServerPort))).start();
-//new Thread(new Server(hostServerPort + 2, new HostServerStrategy("192.168.3.100", hostServerPort + 2, nameServerHost, nameServerPort))).start();
-
 		// Loop until interrupted to end.
 		while (serverState.isControlSwitch()) {
 			try {
@@ -238,7 +237,7 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 	 * Generic server used for spawning both web server & back channel workers.
 	 * Behavior parameterized with different strategies.
 	 */
-	private static class Server implements Runnable {
+	static class Server implements Runnable {
 		/** Port bound to by this server. */
 		private int portNum;
 		
@@ -346,7 +345,7 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 	 * Abstract superclass of Server Strategies.
 	 * Part of Strategy pattern.
 	 */
-	private abstract static class AbstractServerStrategy implements ServerStrategy {
+	abstract static class AbstractServerStrategy implements ServerStrategy {
 		/** Required subclass method to handle requests. */
 		protected abstract void handleRequest(List<String> fullRequest, PrintStream writer, Server server) throws IOException;
 		
@@ -418,7 +417,6 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 		 * Writes error code & html back to browser.
 		 */
 		protected static void writeError(int code, String error, PrintStream writer) throws IOException {
-			System.out.println("Returning " + code + " error: " + error);
 			// Build error response HTML.
 			StringBuilder responseBuilder = new StringBuilder();
 			responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
@@ -478,7 +476,7 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 			
 			// Register host server.
 			String registerRequest = REGISTER_HOST_SERVER + '?' + SERVER + '=' + hostServerHost + ':' + hostServerPort + CRLF;
-			List<String> registerResponse = genericRequest(nameServerHost, nameServerPort, registerRequest);
+			genericRequest(nameServerHost, nameServerPort, registerRequest);
 		}
 
 		/** Echo type name specific for this strategy. */
@@ -514,7 +512,6 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 		    			host = header.substring(HOST_HEADER.length(), header.lastIndexOf(':'));
 		    			break;
 		    		}
-//		    		System.out.println(header);
 		    	}
 
 		    	// Parse request parameters.
@@ -741,7 +738,7 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 			this.peerServerPort = peerServerPort;
 			
 			timer = new Timer();
-//			timer.schedule(new AgentMigratorTimerTask(hostServer, agentServerPort, timer), 30000);			
+			timer.schedule(new AgentMigratorTimerTask(hostServer, agentServerPort, timer), TIMEOUT, TIMEOUT);			
 		}
 
 		/** Echo type name specific for this strategy. */
@@ -767,14 +764,15 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 				else {
 					// Already has peer, tell peers about new address.
 					String syncDataRequest = GET + " /" + SYNC_PEER + '?' + PEER_HOST + '=' + hostServer + ':' + agentServerPort + '&' + PEER_HOST_OLD + '=' + peerHostOld;
-					List<String> syncResponse = genericRequest(peerServer, peerServerPort, syncDataRequest);
+					genericRequest(peerServer, peerServerPort, syncDataRequest);
 				}
 				// Synchronize data.
 				String syncDataRequest = GET + " /" + SYNC_DATA + '?' + PEER_HOST + '=' + hostServer + ':' + agentServerPort;
-				//+ '?' + INPUT + '=' + MAKE_PEER + '&' + PEER_HOST + '=' + hostServer + ':' + agentServerPort + CRLF + CRLF;
 				List<String> syncResponse = genericRequest(peerServer, peerServerPort, syncDataRequest);
-				Map<String,String> paramMap = parseParams(syncResponse.get(0));
-				agentState.addNameValueParams(paramMap);
+				if (syncResponse != null && syncResponse.get(0) != null) {
+					Map<String,String> paramMap = parseParams(syncResponse.get(0));
+					agentState.addNameValueParams(paramMap);
+				}
 			}			
 		}
 		
@@ -793,18 +791,8 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 	    	if (tokens.size() < 2 || !tokens.get(0).equalsIgnoreCase(GET) || tokens.get(1).contains(FAV_ICON)) {
 	    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
 	    		return;
-	    	}
-	    	
-//	    	// Parse host name & port from headers.
-//	    	String host = null, port = null;
-//	    	for (String header : fullRequest) {
-//	    		if (header.contains(HOST_HEADER)) {
-//	    			host = header.substring(HOST_HEADER.length(), header.lastIndexOf(':'));
-//	    			port = header.substring(header.lastIndexOf(':')+1);
-//	    			break;
-//	    		}
-//	    	}
-			System.out.println("Agent working at: " + hostServer + ':' + hostServerPort);
+	    	}	    	
+			System.out.println("Agent working at: " + hostServer + ':' + agentServerPort);
 
 			// Parse input parameters.
 			Map<String,String> paramMap = parseParams(tokens.get(1));
@@ -836,7 +824,7 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
         		agentState.incCount();
     			String makePeerRequest = GET + " /" + SYNC_DATA + '?' + PEER_HOST + '=' + hostServer + ':' + agentServerPort + '&' + agentState.renderNameValueParams();
 				//+ '?' + INPUT + '=' + MAKE_PEER + '&' + PEER_HOST + '=' + hostServer + ':' + agentServerPort + CRLF + CRLF;
-    			List<String> syncResponse = genericRequest(peerServer, peerServerPort, makePeerRequest);
+    			genericRequest(peerServer, peerServerPort, makePeerRequest);
 			}
     		
 			// Build HTML response for browser client.
@@ -870,12 +858,6 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 			migrateRequest += HOST_HEADER + host + ':' + port + CRLF + CRLF;
 			List<String> migrateResponse = genericRequest(host, hostServerPort, migrateRequest);
 			String forwardingAddress = migrateResponse.get(0);
-//			// Tell peers about new address.
-//			String syncDataRequest = GET + " /" + SYNC_PEER + '?' + PEER_HOST + '=' + forwardingAddress + '&' + PEER_HOST_OLD + '=' + hostServer + ':' + agentServerPort;
-//			List<String> syncResponse = genericRequest(peerServer, peerServerPort, syncDataRequest);
-
-//			String newHost = forwardingAddress.substring(0, response.lastIndexOf(':'));
-//			String newPort = forwardingAddress.substring(response.lastIndexOf(':')+1);
 			
 			// Change this server to a zombie server.
 			server.setServerStrategy(new ZombieServerStrategy(host + ':' + port, forwardingAddress));
@@ -919,8 +901,7 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 			}
 			String syncDataRequest = GET + " /" + SYNC_DATA + '?' + PEER_HOST + '=' + ((startAgentServer != null) ? startAgentServer : agentServer) + '&' + agentState.renderNameValueParams();
 					//+ '?' + INPUT + '=' + MAKE_PEER + '&' + PEER_HOST + '=' + hostServer + ':' + agentServerPort + CRLF + CRLF;
-			List<String> syncResponse = genericRequest(peerServer, peerServerPort, syncDataRequest);
-//			System.out.println("Name: " + agentState.getName());
+			genericRequest(peerServer, peerServerPort, syncDataRequest);
 			writer.print(SUCCESS + CRLF);
 			writer.print(CRLF);
 			writer.flush();
@@ -937,7 +918,7 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 			}
 			if (!newPeerServer.equalsIgnoreCase(agentServer)) {
 				String syncDataRequest = GET + " /" + SYNC_PEER + '?' + PEER_HOST + '=' + newPeerServer + '&' + PEER_HOST_OLD + '=' + oldPeerServer;
-				List<String> syncResponse = genericRequest(peerServer, peerServerPort, syncDataRequest);
+				genericRequest(peerServer, peerServerPort, syncDataRequest);
 			}
 			writer.print(SUCCESS + CRLF);
 			writer.print(CRLF);
@@ -956,11 +937,14 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 				this.agentServer = agentServer;
 				this.agentServerPort = agentServerPort;
 				this.timer = timer;
-				System.out.println("Timer loaded.");
 			}
 			
 			public void run() {
-				System.out.println("Timer fired.");
+				if (Math.random() > MIGRATE_CHANCE) {
+					// Not migrating this time.
+					return;
+				}
+				System.out.println("Agent auto-migrating...");
 				StringBuilder migrateRequest = new StringBuilder();
 				migrateRequest.append("GET /?input=migrate HTTP/1.1").append(CRLF);
 				migrateRequest.append("Host: ").append(agentServer).append(':').append(agentServerPort).append(CRLF);
@@ -970,7 +954,7 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 				migrateRequest.append("Accept-Encoding: gzip, deflate").append(CRLF);
 				migrateRequest.append("Connection: close").append(CRLF).append(CRLF);
 				
-				List<String> migrateResponse = genericRequest(agentServer, agentServerPort, migrateRequest.toString());
+				genericRequest(agentServer, agentServerPort, migrateRequest.toString());
 				timer.cancel();
 			}
 		}		
@@ -1032,9 +1016,6 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 				params = tokens.get(1).substring(tokens.get(1).indexOf('?'));
 			}
 
-//			Map<String,String> paramMap = parseParams(tokens.get(1));
-//			String input = paramMap.get(INPUT);
-	    	
     		// HTML redirection to forward request with name/value parameters.
 			StringBuilder responseBuilder = new StringBuilder();
 			responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
@@ -1058,156 +1039,6 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 	}
 	
 
-	/**
-	 * Implementation for processing Name Server client requests.
-	 * Part of Strategy pattern.
-	 */
-	private static class NameServerStrategy extends AbstractServerStrategy {
-		/** List of host servers (server:port). */
-		private List<String> hostServers = new ArrayList<String>();		
-		
-		/** Map of agent names to agent servers (server:port). */
-		private Map<String,String> agentServers = new HashMap<String,String>();		
-		
-		public NameServerStrategy() {
-		}
-
-		/** Echo type name specific for this strategy. */
-		@Override
-		public String getTypeName() {
-			return "Name Server";
-		}
-		
-		/**
-		 * Process request string & delegate to handler functions.
-		 */
-		@Override
-		protected void handleRequest(List<String> fullRequest, PrintStream writer, Server server) throws IOException {
-			// Parse & validate request.
-			String request = fullRequest.get(0);
-	    	StringTokenizer toker = new StringTokenizer(request, " ");
-	    	List<String> tokens = new ArrayList<String>(); 
-	    	while (toker.hasMoreTokens()) {
-	    		tokens.add(toker.nextToken());
-	    	}
-	    	String command = tokens.get(0);
-	    	if (!(command.equalsIgnoreCase(GET) || command.startsWith(REGISTER_HOST_SERVER) || command.startsWith(QUERY_HOST_SERVERS) 
-	    			|| command.startsWith(REGISTER_NEW_AGENT) || command.startsWith(MIGRATE)) || (tokens.size() > 1 && tokens.get(1).contains(FAV_ICON))) {
-	    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
-	    		return;
-	    	}
-//	    	String uri = (tokens.size() > 1) ? tokens.get(1) : "";
-	    	
-	    	// Handle a GET by listing all host servers & agents.
-	    	if (command.equalsIgnoreCase(GET)) {
-	    		handleGetRequest(writer);
-	    	}
-	    	else {
-	    		handleAdminRequest(command, request, writer);
-	    	}	    	
-	    }
-		
-		private void handleGetRequest(PrintStream writer) throws IOException {
-			StringBuilder responseBuilder = new StringBuilder();
-			responseBuilder.append("<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">").append(CRLF);
-			responseBuilder.append("<html><head>").append(CRLF);
-			responseBuilder.append("<title>").append("Name Server Manifest").append("</title>").append(CRLF);
-			responseBuilder.append("</head><body>").append(CRLF);
-			responseBuilder.append("<h1>").append("Name Server Manifest").append("</h1>").append(CRLF);
-			responseBuilder.append("<h2>").append("Host Servers").append("</h2>").append(CRLF);
-			responseBuilder.append("<pre>").append(CRLF);
-			for (String hostServer : hostServers) {
-				responseBuilder.append("<a href=\"http://").append(hostServer).append("/\">");
-				responseBuilder.append(hostServer).append("</a>").append(CRLF);
-			}
-			responseBuilder.append("</pre>").append(CRLF);
-			responseBuilder.append("<h2>").append("Agents").append("</h2>").append(CRLF);
-			responseBuilder.append("<pre>").append(CRLF);
-			for (String agentName : agentServers.keySet()) {
-				responseBuilder.append("<a href=\"http://").append(agentServers.get(agentName)).append("/\">");
-				responseBuilder.append(agentName).append("</a>").append(CRLF);
-			}
-			responseBuilder.append("</pre>").append(CRLF);
-			responseBuilder.append("</body></html>").append(CRLF);			
-			String response = responseBuilder.toString();
-			writeOkHeader(response.length(), mimeTypes.get("html"), writer);
-			writer.print(response);
-			writer.print(CRLF);
-			writer.flush();
-		}
-		
-		private void handleAdminRequest(String command, String request, PrintStream writer) throws IOException {
-			// Parse input parameters.
-			Map<String,String> paramMap = parseParams(command);
-			
-	    	if (command.startsWith(REGISTER_HOST_SERVER)) {
-	    		// Get host server endpoint from request parameters.
-	    		String hostServer = paramMap.get(SERVER);
-	    		if (hostServer == null) {
-		    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
-		    		return;
-	    		}	    			
-    			hostServers.add(hostServer);
-    			System.out.println("Register host server: " + hostServer);
-    			
-    			// Success response.
-    			writer.print(SUCCESS);
-	    	}
-	    	else if (command.startsWith(QUERY_HOST_SERVERS)) {
-	    		// Respond with &-delimited list of host servers.
-	    		String hostServersResponse = new String();
-				for (String hostServer : hostServers) {
-					if (hostServersResponse.length() != 0) {
-						hostServersResponse += '&';
-					}
-					hostServersResponse += hostServer;
-				}
-				
-    			// Host Servers response.
-    			writer.print(hostServersResponse);
-	    	}
-	    	else if (command.startsWith(REGISTER_NEW_AGENT)) {
-	    		// Get agent server endpoint from request parameters.
-	    		String agentServer = paramMap.get(SERVER);
-	    		// Find a peer if one exists, else use itself.
-	    		String peerAgentServer = (agentServers.isEmpty()) ? agentServer : agentServers.values().iterator().next();
-	    		if (agentServer == null) {
-		    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
-		    		return;
-	    		}
-    			String agentName = getUniqueName();
-    			agentServers.put(agentName, agentServer);
-    			System.out.println("Register agent: " + agentName + " at server: " + agentServer);
-    			
-    			// Name response.
-    			writer.print(agentName + '&' + peerAgentServer);
-	    	}
-	    	else if (command.startsWith(MIGRATE)) {
-	    		// Get agent name from request parameters.
-	    		String agentName = paramMap.get(NAME);
-	    		// Get new agent server endpoint from request parameters.
-	    		String agentServer = paramMap.get(SERVER);
-	    		if (agentName == null || agentServer == null) {
-		    		writeError(BAD_REQUEST, "Invalid request for this server: " + request, writer);
-		    		return;
-	    		}	    			
-    			agentServers.put(agentName, agentServer);
-    			System.out.println("Migrate agent: " + agentName + " to server: " + agentServer);
-    			
-    			// Success response.
-    			writer.print(SUCCESS);
-	    	}
-	    	
-	    	// Complete response.
-			writer.print(CRLF);
-			writer.flush();
-		}
-		
-		private static String getUniqueName() {
-			return "" + Math.random();
-		}
-	}
-	
 	/**
 	 * Holds the Agent's state.
 	 */
@@ -1289,7 +1120,7 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 	/**
 	 * Parses request parameters and returns as map.
 	 */
-	private static Map<String,String> parseParams(String request) {
+	static Map<String,String> parseParams(String request) {
 		// Decode params.
 		try {request = URLDecoder.decode(request, "UTF-8");} catch (UnsupportedEncodingException ex) {}
     	Map<String,String> paramMap = new HashMap<String,String>(); 
@@ -1396,7 +1227,6 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 		PrintStream writer = null;
 		try {
 			// Open connection to server.
-			System.out.println("server- " + server + "  port- " + port);
 			socket = new Socket(server, port);
 			// Create reader from socket input stream.
 			reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -1434,7 +1264,7 @@ new Thread(new Server(hostServerPort + 2, new HostServerStrategy("10.14.31.25", 
 	/**
 	 * Encapsulates the state of the server.
 	 */
-	private static class ServerState {
+	static class ServerState {
 		/** Main control switch used for shutdown. */
 		private boolean controlSwitch = true;
 		

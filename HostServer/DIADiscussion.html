@@ -1,0 +1,17 @@
+<html><head>
+<title> DIA - Programming Project Discussion </title>
+</head><body>
+<h1>Distributed Intelligent Agents - Programming Project Discussion</h1>
+<h2>Distributed Systems - 435</h2>
+<h2>Joseph Sackett</h2>
+<h2>Nov. 15, 2013</h2>
+
+<p>The DIA programming project simulates intelligent agents migrating between machines, maintaining state and performing tasks. This was a good opportunity to see some of the design and implementation issues involved in building this complex type of distributed system. This document will describe the solutions (and decisions) I used to build this project. Although the project was not wholly completed, I got the important and difficult elements working to learn the most from the project. </p>
+<p>I completed the name server so that it coordinated multiple host servers and agent migration between them. The name server was very functional except that it was only a single group of agents maintained. It has a UI and services to support most functionality except the display of and movement between multiple groups. The name server also returns random numbers as agent names because that was easy and assigning human names was a trivial and lower priority task than adding some of the advanced functionality which I did elsewhere. </p>
+<p>The host server was highly functional in its support for creating and migrating agents. It communicates with the name server for registration services, spawns agents and handles migration and host requests. Agent migration imitates complex conversation with the agent requesting migration of its host server, the host server querying the name server for other host servers, random selection of new host server, host agent request made of new host server, movement of agent state to endpoint on new host server, zombie left behind on old host server. </p>
+<p>The agents were also advanced as they provided a UI to display their state and accept name-value pairs as input. Upon data update, the agent synchronizes its name-value state with all other agents in the single group. I considered using a centralized data store for the data but instead opted for a distributed data architecture where agents are organized in a token ring of peers and pass the synchronization around the ring whenever any agent (in  the group) has its data updated. Agents in the ring are true peers as there is no controller agent but this would be an easy extension to the communicating ring propagation mechanism. I punted on the lunch problem and implemented no locking of name-value pairs. With a controller, a lock mechanism and lock timeout would be a natural extension. That would be the direction of my future solution to the lunch problem. </p>
+<p>Agents can be explicitly migrated by the user and they automatically migrate as well. I used the zombie solution to forward the user interface to the updated endpoint. This turned out to be a very robust solution and handled an arbitrarily large number of migration levels. Once a zombie performs its task once, it is slain. This works fine since only the agent UI uses the zombies and inter-agent communication uses the correct, updated endpoint. </p>
+<p>This was a fun and challenging project and it was neat to see a microcosm of a real distributed agent system. I am glad I took the opportunity to design and build it. With a little more time, I could have completed all of the required and optional functionality.</p>
+ 
+ </body></html>
+ 

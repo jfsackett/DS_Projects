@@ -1,0 +1,239 @@
+########## HOST SERVER LOG (CONCURRENT WITH NAME SERVER LOG BELOW). ##########
+
+Joe Sackett's DIA Host Server.
+Name Server: localhost:48050
+Host Server: localhost:45050
+Starting Host Server listener on port: 45050
+########## Host Server receives request to display UI.
+Spawning Host Server worker at: 45050 to process request.
+GET / HTTP/1.1
+########## Host Server receives request to create agent.
+Spawning Host Server worker at: 45050 to process request.
+GET /createNew HTTP/1.1
+Hosting Agent at: localhost:53454
+Starting Agent Server listener on port: 53454
+########## Agent Server receives request to display UI.
+Spawning Agent Server worker at: 53454 to process request.
+GET / HTTP/1.1
+Agent working at: localhost:53454
+########## Agent auto-migrates. Coordination between agent, host server and name server.
+Agent auto-migrating...
+Spawning Agent Server worker at: 53454 to process request.
+GET /?input=migrate HTTP/1.1
+Agent working at: localhost:53454
+########## Host Server receives request to migrate agent.
+Spawning Host Server worker at: 45050 to process request.
+Migrate?name=0.11393818016712953&&count=1&peerHost=localhost:53454&peerHostOld=localhost:53454
+########## Host Server receives request to host migrated agent.
+Spawning Host Server worker at: 45050 to process request.
+HostAgent?name=0.11393818016712953&&count=1&peerHost=localhost:53454&peerHostOld=localhost:53454
+Hosting Agent at: localhost:53467
+########## Agent receives requests to synchronize with token ring of peers.
+Starting Agent Server listener on port: 53467
+Spawning Agent Server worker at: 53454 to process request.
+GET /syncPeer?peerHost=localhost:53467&peerHostOld=localhost:53454
+Agent working at: localhost:53454
+Spawning Agent Server worker at: 53467 to process request.
+GET /syncPeer?peerHost=localhost:53467&peerHostOld=localhost:53454
+Agent working at: localhost:53467
+########## Agent receives requests to synchronize data with token ring of peers.
+Spawning Agent Server worker at: 53467 to process request.
+GET /syncData?peerHost=localhost:53467
+Agent working at: localhost:53467
+########## Zombie receives requests to forward to new agent endpoint.
+Spawning Zombie Server worker at: 53454 to process request.
+GET /?input=aaaa&value=aaaa HTTP/1.1
+Zombie forwarding from: localhost:53454 to: localhost:53467
+Zombie Server at: 53454 listener exiting.
+Spawning Agent Server worker at: 53467 to process request.
+########## Agent receives data input request.
+GET /?input=aaaa&value=aaaa HTTP/1.1
+Agent working at: localhost:53467
+########## Agent receives requests to synchronize data with token ring of peers.
+Spawning Agent Server worker at: 53467 to process request.
+GET /syncData?peerHost=localhost:53467&aaaa=aaaa
+Agent working at: localhost:53467
+########## Agent receives data input request.
+Spawning Agent Server worker at: 53467 to process request.
+GET /?input=bbbb&value=bbbb HTTP/1.1
+Agent working at: localhost:53467
+########## Agent receives requests to synchronize data with token ring of peers.
+Spawning Agent Server worker at: 53467 to process request.
+GET /syncData?peerHost=localhost:53467&bbbb=bbbb&aaaa=aaaa
+Agent working at: localhost:53467
+########## Host Server receives request to display UI.
+Spawning Host Server worker at: 45050 to process request.
+GET / HTTP/1.1
+########## Host Server receives request to create agent.
+Spawning Host Server worker at: 45050 to process request.
+GET /createNew HTTP/1.1
+Hosting Agent at: localhost:53498
+########## Agent receives requests to synchronize with token ring of peers.
+Starting Agent Server listener on port: 53498
+Spawning Agent Server worker at: 53467 to process request.
+GET /makePeer?input=makePeer&peerHost=localhost:53498
+Agent working at: localhost:53467
+########## Agent receives requests to synchronize data with token ring of peers.
+Spawning Agent Server worker at: 53467 to process request.
+GET /syncData?peerHost=localhost:53498
+Agent working at: localhost:53467
+Spawning Agent Server worker at: 53498 to process request.
+GET /syncData?peerHost=localhost:53498&bbbb=bbbb&aaaa=aaaa
+Agent working at: localhost:53498
+########## Agent Server receives request to display UI.
+Spawning Agent Server worker at: 53498 to process request.
+GET / HTTP/1.1
+Agent working at: localhost:53498
+########## Agent receives data input request.
+Spawning Agent Server worker at: 53498 to process request.
+GET /?input=cccc&value=cccc HTTP/1.1
+Agent working at: localhost:53498
+########## Agents receive requests to synchronize data with token ring of peers.
+Spawning Agent Server worker at: 53467 to process request.
+GET /syncData?peerHost=localhost:53498&bbbb=bbbb&aaaa=aaaa&cccc=cccc
+Agent working at: localhost:53467
+Spawning Agent Server worker at: 53498 to process request.
+GET /syncData?peerHost=localhost:53498&bbbb=bbbb&aaaa=aaaa&cccc=cccc
+Agent working at: localhost:53498
+########## Agent receives explicit request from user to migrate.
+Spawning Agent Server worker at: 53498 to process request.
+GET /?input=migrate&value= HTTP/1.1
+Agent working at: localhost:53498
+########## Host Server receives request to migrate agent.
+Spawning Host Server worker at: 45050 to process request.
+Migrate?name=0.8524901353601834&bbbb=bbbb&aaaa=aaaa&cccc=cccc&count=2&peerHost=localhost:53467&peerHostOld=localhost:53498
+########## Host Server receives request to host agent.
+Spawning Host Server worker at: 45050 to process request.
+HostAgent?name=0.8524901353601834&bbbb=bbbb&aaaa=aaaa&cccc=cccc&count=2&peerHost=localhost:53467&peerHostOld=localhost:53498
+Hosting Agent at: localhost:53516
+########## Agent receives requests to synchronize with token ring of peers.
+Starting Agent Server listener on port: 53516
+Spawning Agent Server worker at: 53467 to process request.
+GET /syncPeer?peerHost=localhost:53516&peerHostOld=localhost:53498
+Agent working at: localhost:53467
+Spawning Agent Server worker at: 53516 to process request.
+GET /syncPeer?peerHost=localhost:53516&peerHostOld=localhost:53498
+Agent working at: localhost:53516
+########## Agent receives requests to synchronize data with token ring of peers.
+Spawning Agent Server worker at: 53467 to process request.
+GET /syncData?peerHost=localhost:53516
+Agent working at: localhost:53467
+Spawning Agent Server worker at: 53516 to process request.
+GET /syncData?peerHost=localhost:53516&bbbb=bbbb&aaaa=aaaa&cccc=cccc
+Agent working at: localhost:53516
+########## Zombie receives requests to forward to new agent endpoint.
+Spawning Zombie Server worker at: 53498 to process request.
+GET / HTTP/1.1
+Zombie forwarding from: localhost:53498 to: localhost:53516
+Zombie Server at: 53498 listener exiting.
+########## Agent receives UI request.
+Spawning Agent Server worker at: 53516 to process request.
+GET / HTTP/1.1
+Agent working at: localhost:53516
+########## Host Server receives UI request.
+Spawning Host Server worker at: 45050 to process request.
+GET / HTTP/1.1
+########## Host Server receives request to create agent.
+Spawning Host Server worker at: 45050 to process request.
+GET /createNew HTTP/1.1
+Hosting Agent at: localhost:53533
+Starting Agent Server listener on port: 53533
+########## Agent receives requests to synchronize with token ring of peers.
+Spawning Agent Server worker at: 53467 to process request.
+GET /makePeer?input=makePeer&peerHost=localhost:53533
+Agent working at: localhost:53467
+Spawning Agent Server worker at: 53516 to process request.
+########## Agent receives requests to synchronize data with token ring of peers.
+GET /syncData?peerHost=localhost:53533
+Agent working at: localhost:53516
+Spawning Agent Server worker at: 53467 to process request.
+GET /syncData?peerHost=localhost:53533&bbbb=bbbb&aaaa=aaaa&cccc=cccc
+Agent working at: localhost:53467
+Spawning Agent Server worker at: 53533 to process request.
+GET /syncData?peerHost=localhost:53533&bbbb=bbbb&aaaa=aaaa&cccc=cccc
+Agent working at: localhost:53533
+########## Agent receives UI request.
+Spawning Agent Server worker at: 53533 to process request.
+GET / HTTP/1.1
+Agent working at: localhost:53533
+########## Agent auto-migrates. Coordination between agent, host server and name server.
+Agent auto-migrating...
+Spawning Agent Server worker at: 53533 to process request.
+GET /?input=migrate HTTP/1.1
+Agent working at: localhost:53533
+########## Host Server receives request to migrate agent.
+Spawning Host Server worker at: 45050 to process request.
+Migrate?name=0.8033546176080714&bbbb=bbbb&aaaa=aaaa&cccc=cccc&count=1&peerHost=localhost:53516&peerHostOld=localhost:53533
+########## Host Server receives request to host agent.
+Spawning Host Server worker at: 45050 to process request.
+HostAgent?name=0.8033546176080714&bbbb=bbbb&aaaa=aaaa&cccc=cccc&count=1&peerHost=localhost:53516&peerHostOld=localhost:53533
+Hosting Agent at: localhost:53568
+Starting Agent Server listener on port: 53568
+########## Agent receives requests to synchronize with token ring of peers.
+Spawning Agent Server worker at: 53516 to process request.
+GET /syncPeer?peerHost=localhost:53568&peerHostOld=localhost:53533
+Agent working at: localhost:53516
+Spawning Agent Server worker at: 53467 to process request.
+GET /syncPeer?peerHost=localhost:53568&peerHostOld=localhost:53533
+Agent working at: localhost:53467
+Spawning Agent Server worker at: 53568 to process request.
+GET /syncPeer?peerHost=localhost:53568&peerHostOld=localhost:53533
+Agent working at: localhost:53568
+########## Agent receives requests to synchronize data with token ring of peers.
+Spawning Agent Server worker at: 53516 to process request.
+GET /syncData?peerHost=localhost:53568
+Agent working at: localhost:53516
+Spawning Agent Server worker at: 53467 to process request.
+GET /syncData?peerHost=localhost:53568&bbbb=bbbb&aaaa=aaaa&cccc=cccc
+Agent working at: localhost:53467
+Spawning Agent Server worker at: 53568 to process request.
+GET /syncData?peerHost=localhost:53568&bbbb=bbbb&aaaa=aaaa&cccc=cccc
+Agent working at: localhost:53568
+
+
+########## NAME SERVER LOG (CONCURRENT WITH HOST SERVER LOG ABOVE). ##########
+
+Joe Sackett's DIA Name Server.
+Name Server: localhost:48050
+Starting Name Server listener on port: 48050
+########## Receive register host server request.
+Spawning Name Server worker at: 48050 to process request.
+RegisterHostServer?server=localhost:45050
+Register host server: localhost:45050
+########## Receive register agent request.
+Spawning Name Server worker at: 48050 to process request.
+RegisterNewAgent?server=localhost:53454
+Register agent: 0.11393818016712953 at server: localhost:53454
+########## Receive query host servers request (for migration destination).
+Spawning Name Server worker at: 48050 to process request.
+QueryHostServers
+########## Receive migrate agent request.
+Spawning Name Server worker at: 48050 to process request.
+Migrate?name=0.11393818016712953&server=localhost:53467
+Migrate agent: 0.11393818016712953 to server: localhost:53467
+########## Receive register agent request.
+Spawning Name Server worker at: 48050 to process request.
+RegisterNewAgent?server=localhost:53498
+Register agent: 0.8524901353601834 at server: localhost:53498
+########## Receive query host servers request (for migration destination).
+Spawning Name Server worker at: 48050 to process request.
+QueryHostServers
+########## Receive migrate agent request.
+Spawning Name Server worker at: 48050 to process request.
+Migrate?name=0.8524901353601834&server=localhost:53516
+Migrate agent: 0.8524901353601834 to server: localhost:53516
+########## Receive view UI request.
+Spawning Name Server worker at: 48050 to process request.
+GET / HTTP/1.1
+########## Receive register agent request.
+Spawning Name Server worker at: 48050 to process request.
+RegisterNewAgent?server=localhost:53533
+Register agent: 0.8033546176080714 at server: localhost:53533
+########## Receive query host servers request (for migration destination).
+Spawning Name Server worker at: 48050 to process request.
+QueryHostServers
+########## Receive migrate agent request.
+Spawning Name Server worker at: 48050 to process request.
+Migrate?name=0.8033546176080714&server=localhost:53568
+Migrate agent: 0.8033546176080714 to server: localhost:53568
+
